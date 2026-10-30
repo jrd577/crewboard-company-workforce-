@@ -1,0 +1,1483 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Crewboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: sticky site bar with tabs; the crew chart is a top-down tree (owner > divisions > collapsible departments > people). Steel navy chrome, hi-vis amber used only for the brand mark and active tab. */
+:root{
+  --bg:#ECEEEF; --surface:#FFFFFF; --surface-2:#F4F6F7; --ink:#17232C; --ink-2:#55636E;
+  --line:#D7DCDF; --line-2:#AEB9C0; --bar:#14293A; --on-bar:#FFFFFF;
+  --primary:#1E3A4C; --on-primary:#FFFFFF; --accent:#F2B01E; --focus:#2B6CB0;
+  --free:#17754B; --free-bg:#DFF1E8; --busy:#A94505; --busy-bg:#FBE6D5; --off:#56636C; --off-bg:#E7EAEC;
+  --danger:#B3261E;
+  --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --text:'Barlow','Segoe UI',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F161B; --surface:#172028; --surface-2:#1D2831; --ink:#E6ECEF; --ink-2:#9BA9B3;
+    --line:#2A3640; --line-2:#4A5B68; --bar:#0A1218; --on-bar:#E6ECEF;
+    --primary:#6FB1D6; --on-primary:#0A1318; --accent:#F2B01E; --focus:#7DB6E6;
+    --free:#58D49A; --free-bg:#133123; --busy:#F4A261; --busy-bg:#3A2515; --off:#9BA7AF; --off-bg:#26313A;
+    --danger:#F28B82; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F161B; --surface:#172028; --surface-2:#1D2831; --ink:#E6ECEF; --ink-2:#9BA9B3;
+  --line:#2A3640; --line-2:#4A5B68; --bar:#0A1218; --on-bar:#E6ECEF;
+  --primary:#6FB1D6; --on-primary:#0A1318; --accent:#F2B01E; --focus:#7DB6E6;
+  --free:#58D49A; --free-bg:#133123; --busy:#F4A261; --busy-bg:#3A2515; --off:#9BA7AF; --off-bg:#26313A;
+  --danger:#F28B82; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--text);font-size:15px;line-height:1.5;min-height:100vh}
+.wrap{max-width:1180px;margin-inline:auto;padding-inline:16px}
+h1,h2{font-family:var(--display);font-weight:700;margin:0;letter-spacing:.01em}
+h1{font-size:30px;line-height:1.1}
+p{margin:0}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* site bar */
+.bar{background:var(--bar);color:var(--on-bar);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.bar-in{display:flex;flex-wrap:wrap;align-items:center;gap:6px 24px;padding-block:10px 0}
+.brand{display:flex;align-items:center;gap:10px;padding-bottom:10px}
+.brand-name{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:.02em}
+.brand-sub{font-size:12px;opacity:.7;letter-spacing:.08em;text-transform:uppercase}
+.tabs{display:flex;gap:4px;overflow-x:auto;flex:1 1 100%;order:3;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;color:var(--on-bar);opacity:.72;font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.07em;text-transform:uppercase;padding:8px 14px 9px;cursor:pointer;white-space:nowrap}
+.tabs button:hover{opacity:1}
+.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--accent)}
+.role{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:3px 10px;margin-bottom:10px}
+@media (min-width:900px){
+  .tabs{flex:0 1 auto;order:0;align-self:flex-end}
+  .role,.role-btn{order:4}
+}
+
+.role-btn{background:none;color:var(--on-bar);font-family:var(--text);cursor:pointer;min-height:30px}
+.role-btn:hover{background:rgba(255,255,255,.12)}
+.role-btn:not([hidden])+.role{margin-left:0}
+main{padding-block:24px 56px}
+.head-row{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:16px}
+.sub{color:var(--ink-2);margin-top:4px;max-width:60ch}
+.banner{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:14px;color:var(--ink-2)}
+.banner strong{color:var(--ink);font-weight:600}
+
+/* buttons, chips, pills */
+.btn{font:600 14px var(--text);min-height:36px;padding:6px 14px;border-radius:6px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--ink-2)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:600 13px var(--text);min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.free{background:var(--free-bg);color:var(--free)}
+.pill.busy{background:var(--busy-bg);color:var(--busy)}
+.pill.off{background:var(--off-bg);color:var(--off)}
+
+/* stats strip */
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:24px}
+.stat{background:var(--surface);padding:12px 16px}
+.stat b{display:block;font-family:var(--display);font-size:32px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.stat.free b{color:var(--free)} .stat.busy b{color:var(--busy)}
+@media (min-width:700px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* crew chart tree */
+.owner{width:max-content;max-width:100%;margin-inline:auto;display:flex;align-items:center;gap:12px;background:var(--bar);color:var(--on-bar);border-radius:6px;padding:12px 28px 12px 16px}
+.owner-mark{width:14px;height:14px;background:var(--accent);flex:none}
+.owner-role{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.75;font-weight:600}
+.owner-name{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.1}
+.trunk{width:2px;height:22px;background:var(--line-2);margin-inline:auto}
+.divs{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+.div{position:relative;min-width:0}
+.div-head{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.div-head h2{font-size:22px;text-transform:uppercase;letter-spacing:.06em}
+.div-head p{font-size:13px;color:var(--ink-2)}
+.div-count{margin-top:8px;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.div-count .f{color:var(--free)} .div-count .b{color:var(--busy)} .div-count .o{color:var(--off)}
+.depts{list-style:none;margin:0 0 0 14px;padding:0 0 0 18px;border-left:2px solid var(--line-2)}
+.depts>li{position:relative;margin-top:10px}
+.depts>li::before{content:"";position:absolute;left:-18px;top:24px;width:18px;height:2px;background:var(--line-2)}
+.depts>li:first-child{margin-top:0;padding-top:10px}
+.depts>li:first-child::before{top:34px}
+.dept-btn{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer;color:inherit;font:inherit;min-height:48px}
+.dept-btn:hover{border-color:var(--line-2)}
+.dept-btn[aria-expanded="true"]{border-color:var(--primary);border-radius:6px 6px 0 0}
+.chev{width:8px;height:8px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-inline:2px 4px}
+.dept-btn[aria-expanded="true"] .chev{transform:rotate(45deg)}
+.dept-title{flex:1 1 auto;min-width:0}
+.dept-name{display:block;font-weight:600}
+.dept-hint{display:block;font-size:12px;color:var(--ink-2)}
+.dept-sum{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar-mini{display:flex;width:44px;height:6px;border-radius:3px;overflow:hidden;background:var(--line);flex:none}
+.bar-mini i{display:block}
+.b-free{background:var(--free)} .b-busy{background:var(--busy)} .b-off{background:var(--line-2)}
+.dept-body{background:var(--surface);border:1px solid var(--primary);border-top:0;border-radius:0 0 6px 6px;padding:2px 12px 6px}
+.empty-note{padding:12px 0;color:var(--ink-2);font-size:14px}
+.w{display:flex;flex-wrap:wrap;gap:8px 12px;padding:12px 0;border-top:1px solid var(--line)}
+.w:first-child{border-top:0}
+.av{width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-2);display:grid;place-items:center;font-size:13px;font-weight:600;color:var(--ink-2);flex:none}
+.w-main{flex:1 1 180px;min-width:0}
+.w-name{font-weight:600}
+.w-meta,.w-contact{font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+.w-proj{font-size:13px;color:var(--busy);font-weight:500;overflow-wrap:anywhere}
+.w-side{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.assign-row{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface-2);border-radius:6px;padding:10px}
+.assign-row select{flex:1 1 200px;min-width:0}
+@media (min-width:900px){
+  .divs{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+  .div{padding-top:22px}
+  .div::before{content:"";position:absolute;top:0;left:50%;width:2px;height:22px;margin-left:-1px;background:var(--line-2)}
+  .div::after{content:"";position:absolute;top:0;left:-8px;right:-8px;height:2px;background:var(--line-2)}
+  .div:first-child::after{left:50%}
+  .div:last-child::after{right:50%}
+}
+@media (max-width:420px){.bar-mini{display:none}}
+
+/* forms and panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.lbl{font-size:13px;font-weight:600}
+.in{width:100%;padding:9px 10px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;min-height:40px}
+textarea.in{min-height:76px;resize:vertical}
+select.in{padding-right:6px}
+.err{color:var(--danger);font-size:13px;min-height:0}
+.form-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+.check{display:flex;gap:10px;align-items:center;font-weight:500}
+.check input{width:20px;height:20px;accent-color:var(--primary)}
+.note{font-size:13px;color:var(--ink-2)}
+.status-card{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.status-card h2{font-size:22px}
+
+/* projects */
+.proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px}
+.proj{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.proj-top{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+.proj h2{font-size:22px;overflow-wrap:anywhere}
+.proj-meta{font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:12px;font-weight:600;border:1px solid var(--line-2);border-radius:4px;padding:1px 7px;color:var(--ink-2)}
+.team-h{font-family:var(--display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:14px;color:var(--ink-2);border-bottom:1px solid var(--line);padding-bottom:4px}
+.team-row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+.team-row:last-of-type{border-bottom:0}
+.team-row small{display:block;color:var(--ink-2);font-size:12px}
+.proj .assign-row{padding:8px}
+.proj-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.stat-select{min-height:34px;font-size:13px;padding:4px 6px;width:auto}
+
+
+/* project hierarchy diagram */
+.back{margin-bottom:14px}
+.org-wrap{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px 8px 22px;overflow-x:auto;margin-bottom:20px}
+.org{display:flex;flex-direction:column;align-items:center;min-width:min-content}
+.vl{width:2px;height:18px;background:var(--line-2);flex:none}
+.vl.dash{background:none;border-left:2px dashed var(--line-2);width:0}
+.lv-tag{font:600 12px var(--text);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 12px;text-align:center}
+.lv-tag.ext{border-style:dashed}
+.lv-row{display:flex;justify-content:center;align-items:flex-start}
+.nd{position:relative;padding-top:14px;margin:0 6px}
+.nd::before{content:"";position:absolute;top:0;left:50%;width:2px;height:14px;margin-left:-1px;background:var(--line-2)}
+.nd::after{content:"";position:absolute;top:0;left:-6px;right:-6px;height:2px;background:var(--line-2)}
+.nd:first-child::after{left:50%}
+.nd:last-child::after{right:50%}
+.nd:only-child::after{display:none}
+.lv-row.ext .nd::before{background:none;border-left:2px dashed var(--line-2);width:0;margin-left:0}
+.lv-row.ext .nd::after{background:none;border-top:2px dashed var(--line-2);height:0}
+.nd-card{width:148px;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--primary);border-radius:6px;padding:10px 8px;text-align:center}
+.nd-card .av{margin:0 auto 6px;width:32px;height:32px;font-size:12px}
+.nd-name{font-weight:600;font-size:14px;line-height:1.25;overflow-wrap:anywhere}
+.nd-title{font-size:12px;color:var(--ink-2);overflow-wrap:anywhere}
+.nd-dept{display:inline-block;margin-top:5px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);border:1px solid var(--line-2);border-radius:4px;padding:0 5px}
+.nd-card.sup{width:196px;text-align:left;border-top-style:dashed}
+.sup-amt{font-family:var(--display);font-size:20px;font-weight:700;line-height:1.1;margin-top:6px}
+.sup-do{font-size:12px;color:var(--ink-2);margin-top:4px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.owner.small{padding:10px 22px 10px 14px}
+.pill.del{background:var(--free-bg);color:var(--free)}
+.pill.ord{background:var(--busy-bg);color:var(--busy)}
+
+/* suppliers */
+.sup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px}
+.sup-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.sup-card h2{font-size:22px;overflow-wrap:anywhere}
+.items{display:flex;flex-wrap:wrap;gap:6px}
+.item-chip{font-size:12px;font-weight:600;border:1px solid var(--line-2);border-radius:999px;padding:2px 10px;color:var(--ink);background:var(--surface-2);overflow-wrap:anywhere}
+button.item-chip{cursor:pointer;min-height:30px;font-family:inherit}
+button.item-chip:hover{border-color:var(--ink-2)}
+.item-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end;margin-bottom:8px}
+@media (max-width:560px){.item-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.item-row .field:first-child{grid-column:1/-1}}
+.order-row{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.order-row:last-child{border-bottom:0}
+.order-main{flex:1 1 220px;min-width:0}
+.order-amt{font-family:var(--display);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+.link-h{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;letter-spacing:inherit;text-transform:inherit}
+.link-h:hover{text-decoration:underline}
+
+.tools{margin-top:28px;font-size:13px;color:var(--ink-2)}
+.tools summary{cursor:pointer;font-weight:600}
+.tools .form-actions{margin-top:10px}
+
+#toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));max-width:460px;margin-inline:auto;background:var(--bar);color:var(--on-bar);padding:12px 16px;border-radius:8px;font-size:14px;z-index:20}
+#toast[hidden]{display:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+</style>
+
+<header class="bar">
+  <div class="wrap bar-in">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 28 28" role="img" aria-label="Crewboard"><rect width="28" height="28" rx="4" fill="#F2B01E"/><path d="M5 21 L14 7 L23 21 M9.5 15 H18.5" stroke="#14293A" stroke-width="2.6" fill="none" stroke-linecap="square"/></svg>
+      <span class="brand-name">Crewboard</span>
+      <span class="brand-sub" id="brandSub">Company workforce</span>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+    <button type="button" class="role role-btn" id="viewBtn" hidden></button><span class="role" id="role"></span>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="banner"></div>
+
+  <section id="view-chart" aria-labelledby="h-chart">
+    <div class="head-row">
+      <div>
+        <h1 id="h-chart">Crew chart</h1>
+        <p class="sub">Who is free and who is on a project, by department. Tap a department to open its people.</p>
+      </div>
+      <div class="chips" id="filters" role="group" aria-label="Filter people by status"></div>
+      <button class="btn primary" type="button" data-act="worker-add">Add worker</button>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div id="chart-note"></div>
+    <div id="tree"></div>
+  </section>
+
+  <section id="view-projects" aria-labelledby="h-proj" hidden>
+   <div id="projList">
+    <div class="head-row">
+      <div>
+        <h1 id="h-proj">Projects</h1>
+        <p class="sub">Jobs won by the lead team. Assign free crew to each one and the chart updates.</p>
+      </div>
+      <button class="btn primary" type="button" id="newProjBtn">New project</button>
+    </div>
+    <form class="panel" id="projForm" novalidate hidden>
+      <div class="grid2">
+        <div class="field"><label for="p-name">Project name</label><input class="in" id="p-name" maxlength="80" placeholder="Riverside clinic fit-out" autocomplete="off"><div class="err" id="p-name-err"></div></div>
+        <div class="field"><label for="p-client">Client</label><input class="in" id="p-client" maxlength="80" placeholder="Client or company" autocomplete="off"></div>
+        <div class="field"><label for="p-site">Site</label><input class="in" id="p-site" maxlength="80" placeholder="Address or area" autocomplete="off"></div>
+        <div class="field"><label for="p-source">Lead source</label>
+          <select class="in" id="p-source"><option>Marketing lead</option><option>Referral</option><option>Repeat client</option><option>Direct approach</option></select></div>
+        <div class="field"><label for="p-start">Start date</label><input class="in" type="date" id="p-start"></div>
+        <div class="field"><label for="p-end">Target finish</label><input class="in" type="date" id="p-end"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" type="submit">Create project</button>
+        <button class="btn" type="button" id="cancelProj">Cancel</button>
+      </div>
+    </form>
+    <div class="proj-grid" id="projects"></div>
+   </div>
+   <div id="projDetail" hidden></div>
+  </section>
+
+  <section id="view-positions" aria-labelledby="h-pos" hidden>
+    <div class="head-row">
+      <div>
+        <h1 id="h-pos">Positions</h1>
+        <p class="sub">Add worker positions and choose where each one ranks. Higher levels sit higher on every project diagram; positions on the same level are equal.</p>
+      </div>
+    </div>
+    <form class="panel" id="posForm" novalidate>
+      <div class="grid2">
+        <div class="field"><label for="pos-name">Position name</label><input class="in" id="pos-name" maxlength="60" placeholder="Quantity surveyor" autocomplete="off"><div class="err" id="pos-name-err"></div></div>
+        <div class="field"><label for="pos-hint">What they do (optional)</label><input class="in" id="pos-hint" maxlength="80" placeholder="Measurement, costing, valuations" autocomplete="off"></div>
+        <div class="field"><label for="pos-div">Division</label><select class="in" id="pos-div"></select></div>
+        <div class="field"><label for="pos-level">Rank on projects</label><select class="in" id="pos-level"></select></div>
+      </div>
+      <div class="form-actions"><button class="btn primary" type="submit">Add position</button></div>
+    </form>
+    <div id="posList"></div>
+  </section>
+
+  <section id="view-suppliers" aria-labelledby="h-sups" hidden>
+    <div class="head-row">
+      <div>
+        <h1 id="h-sups">Suppliers</h1>
+        <p class="sub">Your suppliers and what they supply. Assign a supplier to a project with an amount and what they must deliver.</p>
+        <div style="margin-top:10px"><button class="btn primary" type="button" data-act="sup-add">Add supplier</button></div>
+      </div>
+    </div>
+    <div id="suppliers" class="sup-grid"></div>
+  </section>
+
+  <section id="view-profile" aria-labelledby="h-prof" hidden>
+    <div class="head-row">
+      <div>
+        <button type="button" class="btn back" data-act="edit-back" id="backWorker" hidden>Back to crew chart</button>
+        <h1 id="h-prof">Join the crew</h1>
+        <p class="sub" id="sub-prof">Create your worker profile, choose your department and say when you are free. The company managers see your status on their crew chart.</p>
+      </div>
+    </div>
+    <div id="myStatus"></div>
+    <form class="panel" id="profForm" novalidate>
+      <div class="grid2">
+        <div class="field"><label for="f-name">Full name</label><input class="in" id="f-name" maxlength="80" autocomplete="name"><div class="err" id="f-name-err"></div></div>
+        <div class="field"><label for="f-dept">Department</label><select class="in" id="f-dept"></select><div class="err" id="f-dept-err"></div></div>
+        <div class="field"><label for="f-title">Specialty</label><input class="in" id="f-title" maxlength="60" placeholder="Structural engineer, electrician, mason" autocomplete="off"><div class="err" id="f-title-err"></div></div>
+        <div class="field"><label for="f-years">Years of experience</label><input class="in" id="f-years" type="number" min="0" max="60" inputmode="numeric" placeholder="5"><div class="err" id="f-years-err"></div></div>
+        <div class="field"><label for="f-rate">Your price (KSh)</label><input class="in" id="f-rate" type="number" min="0" step="any" inputmode="decimal" placeholder="2500"><div class="err" id="f-rate-err"></div></div>
+        <div class="field"><label for="f-rate-unit">Charged per</label><select class="in" id="f-rate-unit"><option value="hour">Hour</option><option value="day" selected>Day</option><option value="week">Week</option><option value="month">Month</option><option value="job">Whole job</option></select></div>
+        <div class="field"><label for="f-phone">Phone</label><input class="in" id="f-phone" maxlength="30" autocomplete="tel" inputmode="tel"><div class="err" id="f-phone-err"></div></div>
+        <div class="field"><label for="f-area">Area you work in</label><input class="in" id="f-area" maxlength="60" autocomplete="off"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label for="f-skills">Skills and certificates</label><textarea class="in" id="f-skills" maxlength="400" placeholder="Licences, tools, machines, languages"></textarea></div>
+      <div class="form-actions">
+        <label class="check"><input type="checkbox" id="f-avail" checked> I am available for new work</label>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="saveProf">Join the crew</button>
+        <button class="btn danger" type="button" id="delProf" hidden>Delete my profile</button>
+      </div>
+      <div class="err" id="f-form-err" role="alert"></div>
+    </form>
+  </section>
+
+  <section id="view-supjoin" aria-labelledby="h-supjoin" hidden>
+    <div class="head-row">
+      <div>
+        <button type="button" class="btn back" data-act="edit-back" id="backSup" hidden>Back to suppliers</button>
+        <h1 id="h-supjoin">Join as a supplier</h1>
+        <p class="sub" id="sub-sup">Register your company and list the things you supply. Managers can then assign you to a project with an amount and what to deliver.</p>
+      </div>
+    </div>
+    <div id="mySupStatus"></div>
+    <form class="panel" id="supForm" novalidate>
+      <div class="grid2">
+        <div class="field"><label for="s-company">Company or business name</label><input class="in" id="s-company" maxlength="80" autocomplete="organization"><div class="err" id="s-company-err"></div></div>
+        <div class="field"><label for="s-name">Contact person</label><input class="in" id="s-name" maxlength="80" autocomplete="name"></div>
+        <div class="field"><label for="s-phone">Phone</label><input class="in" id="s-phone" maxlength="30" autocomplete="tel" inputmode="tel"><div class="err" id="s-phone-err"></div></div>
+        <div class="field"><label for="s-cat">Category</label>
+          <select class="in" id="s-cat"><option>Building materials</option><option>Steel and metal</option><option>Electrical</option><option>Plumbing</option><option>Paint and finishes</option><option>Tools and equipment hire</option><option>Transport and delivery</option><option>Other</option></select></div>
+        <div class="field"><label for="s-area">Area you deliver to</label><input class="in" id="s-area" maxlength="60" autocomplete="off"></div>
+      </div>
+      <div style="margin-top:16px"><div class="lbl" style="margin-bottom:8px">Things you supply</div><div id="s-items"></div><div class="err" id="s-items-err"></div>
+        <button class="btn" type="button" data-act="item-add">Add an item</button></div>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="saveSup">Join as supplier</button>
+        <button class="btn danger" type="button" id="delSup" hidden>Delete my supplier profile</button>
+      </div>
+      <div class="err" id="s-form-err" role="alert"></div>
+    </form>
+  </section>
+</main>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* Supabase adapter: gives the page the same db/user interface it used on Claude, backed by Supabase tables, auth and realtime. */
+(function(){
+"use strict";
+var SB_URL="https://dhsydjkjocxjalyaehkm.supabase.co";
+var SB_KEY="sb_publishable_UjAz34c-Xt367RaepBXlQw_RS3cZDCG";
+var SUPPLIER_PAGE=document.body.getAttribute("data-page")==="supplier";
+
+function showFatal(msg){
+  var d=document.createElement("div");
+  d.setAttribute("style","position:fixed;inset:0;z-index:100;background:var(--bg);color:var(--ink);padding:24px 16px;font-family:var(--text)");
+  d.innerHTML='<div class="panel" style="max-width:420px;margin:8vh auto 0"><strong>Crewboard could not start.</strong><p class="note" style="margin-top:6px">'+msg+'</p></div>';
+  document.body.appendChild(d);
+}
+if(!window.supabase||!window.supabase.createClient){showFatal("The connection library did not load. Check your internet connection and reload the page.");return;}
+
+var sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+
+/* page field name -> table column */
+var SPEC={
+  workers:{name:"name",dept:"dept",title:"title",phone:"phone",years:"years",rate:"rate",rateUnit:"rate_unit",area:"area",skills:"skills",available:"available",updatedAt:"updated_at",createdAt:"created_at"},
+  suppliers:{company:"company",name:"contact",phone:"phone",category:"category",area:"area",items:"items",updatedAt:"updated_at",createdAt:"created_at"},
+  projects:{name:"name",client:"client",site:"site",source:"source",start:"start_date",end:"end_date",status:"status",createdAt:"created_at"},
+  positions:{kind:"kind",dept:"dept",name:"name",hint:"hint",div:"division",level:"level",createdAt:"created_at"},
+  assignments:{workerId:"worker_id",projectId:"project_id",since:"since",by:"assigned_by"},
+  supplies:{supplierId:"supplier_id",projectId:"project_id",amount:"amount",deliver:"deliver",due:"due",status:"status",createdAt:"created_at",by:"assigned_by"}
+};
+var EMPTY_IS_NULL={assigned_by:1,due:1,start_date:1,end_date:1};
+var NULL_IS_EMPTY={due:1,start_date:1,end_date:1};
+
+function toRow(t,o){
+  var f=SPEC[t],r={};
+  Object.keys(o||{}).forEach(function(k){
+    var c=f[k];if(!c)return;
+    var v=o[k];if(v===""&&EMPTY_IS_NULL[c])v=null;
+    r[c]=v;
+  });
+  return r;
+}
+function fromRow(t,row){
+  var f=SPEC[t],o={};
+  Object.keys(f).forEach(function(k){
+    var c=f[k];
+    if(c in row){var v=row[c];if(v===null&&NULL_IS_EMPTY[c])v="";o[k]=v;}
+  });
+  return o;
+}
+function rowId(t,row){return t==="assignments"?row.worker_id+"__"+row.project_id:row.id;}
+function pkOf(t,id){
+  if(t==="assignments"){var j=id.indexOf("__");return {worker_id:id.slice(0,j),project_id:id.slice(j+2)};}
+  return {id:id};
+}
+function uuid(){
+  if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==="x"?r:(r&3|8)).toString(16);});
+}
+function fail(error){
+  var m=String(error.message||"").toLowerCase();
+  var e=new Error(error.message||"Database error");
+  e.code=(error.code==="42501"||m.indexOf("row-level security")>=0||m.indexOf("permission denied")>=0)?"invalid_argument":"unavailable";
+  throw e;
+}
+function chk(res){if(res&&res.error)fail(res.error);return res;}
+
+/* live refresh: one realtime channel per table, plus a slow poll as a safety net */
+var subs={},chans={},timers={};
+function fire(t){
+  clearTimeout(timers[t]);
+  timers[t]=setTimeout(function(){(subs[t]||[]).slice().forEach(function(s){s.run();});},120);
+}
+function ensureChannel(t){
+  if(chans[t])return;
+  chans[t]=sb.channel("rt-"+t).on("postgres_changes",{event:"*",schema:"public",table:t},function(){fire(t);}).subscribe();
+}
+function subscribe(t,load,deliver,onErr){
+  var s={run:function(){
+    Promise.resolve(load()).then(function(res){
+      if(res.error){if(onErr)onErr(res.error);return;}
+      deliver(res.data||[]);
+    }).catch(function(e){if(onErr)onErr(e);});
+  }};
+  (subs[t]=subs[t]||[]).push(s);
+  ensureChannel(t);
+  s.run();
+  return function(){subs[t]=(subs[t]||[]).filter(function(x){return x!==s;});};
+}
+setInterval(function(){if(!document.hidden)Object.keys(subs).forEach(fire);},20000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)Object.keys(subs).forEach(fire);});
+
+function docRef(path){
+  var i=path.indexOf("/"),t=path.slice(0,i),id=path.slice(i+1),k=pkOf(t,id);
+  function where(q){Object.keys(k).forEach(function(c){q=q.eq(c,k[c]);});return q;}
+  return {
+    set:function(d){
+      var row=Object.assign(toRow(t,d),k);
+      return Promise.resolve(sb.from(t).upsert(row,{onConflict:t==="assignments"?"worker_id,project_id":"id"})).then(chk).then(function(){fire(t);});
+    },
+    update:function(d){
+      return Promise.resolve(where(sb.from(t).update(toRow(t,d)))).then(chk).then(function(){fire(t);});
+    },
+    delete:function(){
+      return Promise.resolve(where(sb.from(t).delete())).then(chk).then(function(){fire(t);});
+    },
+    onSnapshot:function(cb,onErr){
+      return subscribe(t,function(){return where(sb.from(t).select("*")).limit(1);},function(rows){
+        var row=rows[0];
+        cb({exists:!!row,id:id,data:function(){return row?fromRow(t,row):undefined;}});
+      },onErr);
+    }
+  };
+}
+function collRef(t){
+  return {
+    add:function(o){
+      var id=uuid(),row=Object.assign(toRow(t,o),{id:id});
+      return Promise.resolve(sb.from(t).insert(row)).then(chk).then(function(){fire(t);return {id:id};});
+    },
+    onSnapshot:function(cb,onErr){
+      return subscribe(t,function(){return sb.from(t).select("*");},function(rows){
+        cb({docs:rows.map(function(r){return {id:rowId(t,r),data:function(){return fromRow(t,r);}};})});
+      },onErr);
+    }
+  };
+}
+var db={doc:docRef,collection:collRef};
+
+/* sign-in */
+var session=null,resolveReady,ready=new Promise(function(r){resolveReady=r;});
+var mgrP=null;
+var user={
+  id:function(){return Promise.resolve(session.user.id);},
+  canEdit:function(){
+    if(!mgrP)mgrP=Promise.resolve(sb.from("managers").select("user_id").eq("user_id",session.user.id).limit(1)).then(function(r){return !r.error&&!!r.data&&r.data.length>0;});
+    return mgrP;
+  },
+  isOwner:function(){return Promise.resolve(false);},
+  can:function(){return Promise.resolve(true);}
+};
+window.claude={use:function(n){
+  if(n==="db")return ready.then(function(){return db;});
+  if(n==="user")return ready.then(function(){return user;});
+  return Promise.resolve(null);
+}};
+
+function addSignOut(){
+  var bar=document.querySelector(".bar-in");
+  if(!bar||document.getElementById("signOutBtn"))return;
+  var b=document.createElement("button");
+  b.type="button";b.id="signOutBtn";b.className="role role-btn";b.style.marginLeft="0";
+  b.textContent="Sign out";
+  b.addEventListener("click",function(){sb.auth.signOut().then(function(){location.reload();});});
+  bar.appendChild(b);
+}
+function start(s){
+  session=s;
+  var ov=document.getElementById("auth-overlay");if(ov)ov.remove();
+  addSignOut();
+  resolveReady(s);
+}
+function showLogin(){
+  var title=SUPPLIER_PAGE?"Sign in or create an account":"Manager sign in";
+  var sub=SUPPLIER_PAGE
+    ?"New here? Create an account, then fill in your worker or supplier profile. Already registered? Sign in to update it."
+    :"Sign in with your manager account to see the crew chart, projects and suppliers.";
+  var ov=document.createElement("div");
+  ov.id="auth-overlay";
+  ov.setAttribute("style","position:fixed;inset:0;z-index:100;background:var(--bg);color:var(--ink);overflow:auto;padding:24px 16px;font-family:var(--text)");
+  ov.innerHTML=
+   '<div style="max-width:420px;margin:6vh auto 0">'+
+   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px"><svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="4" fill="#F2B01E"/><path d="M5 21 L14 7 L23 21 M9.5 15 H18.5" stroke="#14293A" stroke-width="2.6" fill="none" stroke-linecap="square"/></svg><span class="brand-name" style="color:var(--ink)">Crewboard</span></div>'+
+   '<h1>'+title+'</h1><p class="sub" style="margin-bottom:16px">'+sub+'</p>'+
+   '<form class="panel" id="authForm" novalidate>'+
+   '<div class="field"><label for="auth-email">Email</label><input class="in" id="auth-email" type="email" autocomplete="email" inputmode="email"></div>'+
+   '<div class="field" style="margin-top:14px"><label for="auth-pass">Password (6 characters or more)</label><input class="in" id="auth-pass" type="password" autocomplete="current-password"></div>'+
+   '<div class="form-actions"><button class="btn primary" type="submit" id="auth-in">Sign in</button><button class="btn" type="button" id="auth-up">Create account</button></div>'+
+   '<div class="err" id="auth-err" role="alert" style="margin-top:10px"></div>'+
+   '</form></div>';
+  document.body.appendChild(ov);
+  var email=document.getElementById("auth-email"),pass=document.getElementById("auth-pass"),err=document.getElementById("auth-err");
+  var bIn=document.getElementById("auth-in"),bUp=document.getElementById("auth-up");
+  function busy(on){bIn.disabled=on;bUp.disabled=on;}
+  function creds(){
+    var e=email.value.trim(),p=pass.value;
+    if(!e||e.indexOf("@")<1){err.textContent="Enter your email address.";return null;}
+    if(p.length<6){err.textContent="Enter a password of at least 6 characters.";return null;}
+    err.textContent="";return {email:e,password:p};
+  }
+  document.getElementById("authForm").addEventListener("submit",function(ev){
+    ev.preventDefault();
+    var c=creds();if(!c)return;
+    busy(true);
+    sb.auth.signInWithPassword(c).then(function(r){
+      busy(false);
+      if(r.error){err.textContent=r.error.message==="Invalid login credentials"?"Wrong email or password. If you have no account yet, choose Create account.":r.error.message;return;}
+      start(r.data.session);
+    }).catch(function(){busy(false);err.textContent="Could not reach the server. Check your connection and try again.";});
+  });
+  bUp.addEventListener("click",function(){
+    var c=creds();if(!c)return;
+    busy(true);
+    sb.auth.signUp(c).then(function(r){
+      busy(false);
+      if(r.error){err.textContent=r.error.message;return;}
+      if(r.data&&r.data.session){start(r.data.session);return;}
+      if(r.data&&r.data.user&&r.data.user.identities&&r.data.user.identities.length===0){err.textContent="That email already has an account. Choose Sign in.";return;}
+      err.textContent="Account created. Open the confirmation email we sent you, then come back and sign in.";
+    }).catch(function(){busy(false);err.textContent="Could not reach the server. Check your connection and try again.";});
+  });
+}
+
+sb.auth.getSession().then(function(r){
+  if(r.data&&r.data.session)start(r.data.session);else showLogin();
+}).catch(showLogin);
+})();
+</script>
+<script>
+(function(){
+"use strict";
+
+var BASE_DIVS=[
+ {id:"commercial",name:"Commercial",sub:"Wins and prices the work",depts:[
+  {id:"marketing",name:"Marketing",hint:"Brand, content, ads"},
+  {id:"sales",name:"Sales",hint:"Finds and closes clients"},
+  {id:"estimating",name:"Estimating",hint:"Takeoffs and quotes"},
+  {id:"qs",name:"Quantity surveyors",hint:"Measurement, costing, valuations"}]},
+ {id:"operations",name:"Operations",sub:"Delivers the work",depts:[
+  {id:"pm",name:"Project managers",hint:"One per live project"},
+  {id:"engineers",name:"Engineers",hint:"Civil, structural, MEP"},
+  {id:"architects",name:"Architects and designers",hint:"Design, CAD, permits"},
+  {id:"supervisors",name:"Site supervisors",hint:"Foremen and site leads"},
+  {id:"trades",name:"Skilled trades",hint:"Masons, electricians, plumbers"},
+  {id:"laborers",name:"Laborers",hint:"General site labor"},
+  {id:"inspectors",name:"Quality inspectors",hint:"QA/QC sign-off"},
+  {id:"safety",name:"Safety officers",hint:"Site safety and compliance"},
+  {id:"survey",name:"Land surveyors",hint:"Setting out, levels, boundaries"},
+  {id:"plant",name:"Plant operators and drivers",hint:"Excavators, cranes, trucks"}]},
+ {id:"support",name:"Support",sub:"Keeps the company running",depts:[
+  {id:"procurement",name:"Procurement",hint:"Buyers and suppliers"},
+  {id:"finance",name:"Finance and billing",hint:"Accounts and collections"},
+  {id:"legal",name:"Legal and compliance",hint:"Licences and contracts"},
+  {id:"admin",name:"Admin and systems",hint:"HR, stores, data"},
+  {id:"stores",name:"Storekeepers",hint:"Site stores and materials"}]}
+];
+/* seniority on a project, most senior first. Positions in the same level are equal roles and sit side by side. Managers can add positions and move any position between levels from the Positions tab. */
+var BASE_LEVELS=[
+ {name:"Project management",depts:["pm"]},
+ {name:"Engineering and design",depts:["engineers","architects","estimating","qs","survey"]},
+ {name:"Site leads and support",depts:["supervisors","inspectors","safety","procurement","finance","legal","sales","marketing","admin","stores"]},
+ {name:"Skilled trades",depts:["trades","plant"]},
+ {name:"General labor",depts:["laborers"]}
+];
+var DIVISIONS=[],DEPTS={},LEVELS=[],RANK={};
+function syncDepts(){
+  var baseRank={};
+  BASE_LEVELS.forEach(function(l,i){l.depts.forEach(function(d){baseRank[d]=i;});});
+  var docs=Array.from(state.positions.values()),ov={};
+  docs.forEach(function(o){if(o.kind==="level")ov[o.dept]=Number(o.level);});
+  DIVISIONS=BASE_DIVS.map(function(dv){return {id:dv.id,name:dv.name,sub:dv.sub,depts:dv.depts.map(function(d){return {id:d.id,name:d.name,hint:d.hint};})};});
+  docs.filter(function(o){return o.kind==="custom";}).sort(function(a,b){return String(a.name).localeCompare(String(b.name));}).forEach(function(o){
+    var dv=DIVISIONS.filter(function(x){return x.id===o.div;})[0]||DIVISIONS[1];
+    dv.depts.push({id:"c-"+o.id,name:o.name,hint:o.hint||"",custom:true,level:Number(o.level)});
+  });
+  DEPTS={};RANK={};
+  LEVELS=BASE_LEVELS.map(function(l){return {name:l.name,depts:[]};});
+  DIVISIONS.forEach(function(dv){dv.depts.forEach(function(d){
+    d.div=dv.id;d.divName=dv.name;
+    var lv=ov[d.id];
+    if(lv==null||isNaN(lv))lv=d.custom?d.level:baseRank[d.id];
+    if(lv==null||isNaN(lv)||lv<0||lv>=LEVELS.length)lv=LEVELS.length-1;
+    d.level=lv;DEPTS[d.id]=d;RANK[d.id]=lv;LEVELS[lv].depts.push(d.id);
+  });});
+}
+var CUR="KSh";
+
+var state={
+  mode:"preview", db:null, uid:null, isManager:true, canWrite:true,
+  view:"dash", tab:"chart", filter:"all", open:new Set(["engineers"]),
+  workers:new Map(), projects:new Map(), assignments:new Map(), myDoc:null, formFilled:false,
+  positions:new Map(), confirmPos:null, suppliers:new Map(), supplies:new Map(), mySup:null, supFormFilled:false, supItems:[{name:"",unit:"",price:""}], confirmDeleteSup:false,
+  viewProject:null, orderOpen:null, draft:{}, confirmOrder:null,
+  assigning:null, assignPick:"", projPick:{}, confirmDelete:null, confirmDeleteProfile:false, loadedLive:false, edit:null
+};
+syncDepts();
+
+var $=function(id){return document.getElementById(id);};
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});};
+var initials=function(n){var p=String(n||"?").trim().split(/\s+/);return ((p[0]||"?")[0]+((p[1]||"")[0]||"")).toUpperCase();};
+var iso=function(){return new Date().toISOString();};
+
+var toastTimer;
+function toast(msg){var t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.hidden=true;},4500);}
+function dbError(e){
+  var c=e&&e.code;
+  if(c==="invalid_argument")return "You do not have permission to change this. Ask the owner for Contributor access.";
+  if(c==="quota_exceeded")return "The storage limit for this page is full.";
+  if(c==="resource_exhausted")return "Too many changes at once. Wait a moment and try again.";
+  return "That did not save. Check your connection and try again.";
+}
+
+/* derived */
+function assignsOf(wid){
+  return Array.from(state.assignments.values()).filter(function(a){return (a.workerId||a.id)===wid;}).map(function(a){return {a:a,p:state.projects.get(a.projectId)};}).filter(function(x){return x.p&&x.p.status!=="done";});
+}
+function assignId(wid,pid){
+  var f=Array.from(state.assignments.values()).filter(function(a){return (a.workerId||a.id)===wid&&a.projectId===pid;})[0];
+  return f?f.id:"";
+}
+/* support staff can sit on any number of projects at once; everyone else holds one project at a time */
+function isMulti(w){var d=DEPTS[w.dept];return !!d&&d.div==="support";}
+function statusOf(w){
+  var list=assignsOf(w.id);
+  if(isMulti(w))return {key:w.available===false?"off":"free",list:list,project:list[0]&&list[0].p};
+  if(list.length)return {key:"busy",project:list[0].p,list:list};
+  if(w.available===false)return {key:"off",list:list};
+  return {key:"free",list:list};
+}
+var ORDER={free:0,busy:1,off:2};
+function sortWorkers(a,b){var d=ORDER[statusOf(a).key]-ORDER[statusOf(b).key];return d||String(a.name).localeCompare(String(b.name));}
+function count(list){var c={free:0,busy:0,off:0};list.forEach(function(w){c[statusOf(w).key]++;});return c;}
+function activeProjects(){return Array.from(state.projects.values()).filter(function(p){return p.status!=="done";});}
+var RATE_SHORT={hour:"hr",day:"day",week:"wk",month:"mo",job:"job"};
+function rateText(w){return w&&Number(w.rate)>0?money(w.rate)+"/"+(RATE_SHORT[w.rateUnit]||"day"):"";}
+function money(n){return CUR+" "+Number(n||0).toLocaleString();}
+function suppliesOf(pid){return Array.from(state.supplies.values()).filter(function(o){return o.projectId===pid;}).sort(function(a,b){return String(a.createdAt||"").localeCompare(String(b.createdAt||""));});}
+function supplierName(id){var x=state.suppliers.get(id);return x?x.company:"Removed supplier";}
+function projectName(id){var x=state.projects.get(id);return x?x.name:"Removed project";}
+function byCompany(a,b){return String(a.company).localeCompare(String(b.company));}
+function typing(box){var a=document.activeElement;return !!(a&&box&&box.contains(a)&&(a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&a.type!=="checkbox"&&a.type!=="button")));}
+
+/* Store: writes go to the shared database when live, otherwise to local memory. */
+var store={
+  saveProfile:function(d,id){
+    if(state.db)return state.db.doc("workers/"+(id||state.uid)).set(d);
+    var w=Object.assign({id:"me"},d);state.workers.set("me",w);state.myDoc=w;return Promise.resolve();
+  },
+  patchProfile:function(p){
+    if(state.db)return state.db.doc("workers/"+state.uid).update(p);
+    var w=Object.assign({},state.myDoc,p);state.workers.set("me",w);state.myDoc=w;return Promise.resolve();
+  },
+  deleteProfile:function(id){
+    if(state.db)return state.db.doc("workers/"+(id||state.uid)).delete();
+    state.workers.delete("me");state.myDoc=null;return Promise.resolve();
+  },
+  assign:function(wid,pid){
+    var id=wid+"__"+pid,a={workerId:wid,projectId:pid,since:iso(),by:state.uid||""};
+    if(state.db)return state.db.doc("assignments/"+id).set(a);
+    state.assignments.set(id,Object.assign({id:id},a));return Promise.resolve();
+  },
+  release:function(wid){
+    if(state.db)return state.db.doc("assignments/"+wid).delete();
+    state.assignments.delete(wid);return Promise.resolve();
+  },
+  addProject:function(p){
+    if(state.db)return state.db.collection("projects").add(p);
+    var id="local-"+Date.now();state.projects.set(id,Object.assign({id:id},p));return Promise.resolve();
+  },
+  patchProject:function(id,p){
+    if(state.db)return state.db.doc("projects/"+id).update(p);
+    state.projects.set(id,Object.assign({},state.projects.get(id),p));return Promise.resolve();
+  },
+  deleteProject:function(id){
+    if(state.db)return state.db.doc("projects/"+id).delete();
+    state.projects.delete(id);return Promise.resolve();
+  },
+  addPosition:function(o){
+    if(state.db)return state.db.collection("positions").add(o);
+    var id="local-pos"+Date.now();state.positions.set(id,Object.assign({id:id},o));return Promise.resolve();
+  },
+  patchPosition:function(id,p){
+    if(state.db)return state.db.doc("positions/"+id).update(p);
+    state.positions.set(id,Object.assign({},state.positions.get(id),p));return Promise.resolve();
+  },
+  setLevel:function(dept,lv){
+    var o={kind:"level",dept:dept,level:lv};
+    if(state.db)return state.db.doc("positions/lvl-"+dept).set(o);
+    state.positions.set("lvl-"+dept,Object.assign({id:"lvl-"+dept},o));return Promise.resolve();
+  },
+  deletePosition:function(id){
+    if(state.db)return state.db.doc("positions/"+id).delete();
+    state.positions.delete(id);return Promise.resolve();
+  },
+  saveSupplier:function(d,id){
+    if(state.db)return state.db.doc("suppliers/"+(id||state.uid)).set(d);
+    var w=Object.assign({id:"me-sup"},d);state.suppliers.set("me-sup",w);state.mySup=w;return Promise.resolve();
+  },
+  deleteSupplier:function(id){
+    if(state.db)return state.db.doc("suppliers/"+(id||state.uid)).delete();
+    state.suppliers.delete("me-sup");state.mySup=null;return Promise.resolve();
+  },
+  addSupply:function(o){
+    if(state.db)return state.db.collection("supplies").add(o);
+    var id="local-o"+Date.now();state.supplies.set(id,Object.assign({id:id},o));return Promise.resolve();
+  },
+  patchSupply:function(id,p){
+    if(state.db)return state.db.doc("supplies/"+id).update(p);
+    state.supplies.set(id,Object.assign({},state.supplies.get(id),p));return Promise.resolve();
+  },
+  deleteSupply:function(id){
+    if(state.db)return state.db.doc("supplies/"+id).delete();
+    state.supplies.delete(id);return Promise.resolve();
+  }
+};
+function removeSuppliesOn(pid){
+  var ids=Array.from(state.supplies.values()).filter(function(o){return o.projectId===pid;}).map(function(o){return o.id;});
+  return ids.reduce(function(chain,id){return chain.then(function(){return store.deleteSupply(id);});},Promise.resolve());
+}
+function releaseAllOn(pid){
+  var ids=Array.from(state.assignments.values()).filter(function(a){return a.projectId===pid;}).map(function(a){return a.id;});
+  return ids.reduce(function(chain,id){return chain.then(function(){return store.release(id);});},Promise.resolve());
+}
+function newId(){
+  if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==="x"?r:(r&3|8)).toString(16);});
+}
+function releaseWorker(wid){
+  var ids=Array.from(state.assignments.values()).filter(function(a){return (a.workerId||a.id)===wid;}).map(function(a){return a.id;});
+  return ids.reduce(function(chain,id){return chain.then(function(){return store.release(id);});},Promise.resolve());
+}
+function removeSuppliesFor(sid){
+  var ids=Array.from(state.supplies.values()).filter(function(o){return o.supplierId===sid;}).map(function(o){return o.id;});
+  return ids.reduce(function(chain,id){return chain.then(function(){return store.deleteSupply(id);});},Promise.resolve());
+}
+function clearErrs(list){list.forEach(function(k){var e=$(k+"-err");if(e)e.textContent="";});}
+function openWorkerForm(id){
+  state.edit={kind:"worker",id:id||null};state.tab="wform";state.confirmDeleteProfile=false;
+  $("profForm").reset();
+  clearErrs(["f-name","f-dept","f-title","f-years","f-rate","f-phone","f-form"]);
+  var d=id?state.workers.get(id):null;
+  if(d)fillForm(d);
+  renderAll();window.scrollTo(0,0);
+}
+function openSupplierForm(id){
+  state.edit={kind:"supplier",id:id||null};state.tab="sform";state.confirmDeleteSup=false;
+  $("supForm").reset();
+  state.supItems=[{name:"",unit:"",price:""}];renderSupItems();
+  clearErrs(["s-company","s-phone","s-items","s-form"]);
+  var d=id?state.suppliers.get(id):null;
+  if(d)fillSupForm(d);
+  renderAll();window.scrollTo(0,0);
+}
+function leaveEdit(){
+  var k=state.edit&&state.edit.kind;
+  state.edit=null;state.confirmDeleteProfile=false;state.confirmDeleteSup=false;
+  state.tab=k==="supplier"?"suppliers":"chart";
+  renderAll();window.scrollTo(0,0);
+}
+function tryAssign(wid,pid){
+  var w=state.workers.get(wid),pr=state.projects.get(pid);
+  if(!w||!pr||pr.status==="done"){toast("That project is closed or the worker no longer exists.");schedule();return;}
+  if(assignId(wid,pid)){toast(w.name+" is already on this project.");schedule();return;}
+  var st=statusOf(w);
+  if(st.key!=="free"){toast(w.name+(st.key==="busy"?" is already on "+st.project.name+". Release them first.":" is marked unavailable and cannot be assigned."));schedule();return;}
+  run(store.assign(wid,pid),"Assigned.");
+}
+function run(promise,okMsg){
+  return promise.then(function(){if(okMsg)toast(okMsg);schedule();}).catch(function(e){toast(dbError(e));schedule();});
+}
+
+/* rendering */
+var raf=0;
+function schedule(){cancelAnimationFrame(raf);raf=requestAnimationFrame(renderAll);}
+
+function renderAll(){
+  syncDepts();buildDeptSelect();
+  renderChrome();renderBanner();
+  if(state.isManager&&state.view==="dash"){renderStats();renderFilters();renderChartNote();renderTree();renderProjects();renderSuppliers();renderPositions();}
+  renderMyStatus();renderMySup();
+}
+
+function renderChrome(){
+  var dash=state.view==="dash";
+  var tabs=dash?[["chart","Crew chart"],["projects","Projects"],["suppliers","Suppliers"],["positions","Positions"]]:[["profile",state.myDoc?"My worker profile":"Join as worker"],["supjoin",state.mySup?"My supplier profile":"Join as supplier"]];
+  var cur=state.tab;
+  if(dash&&state.edit)cur=state.tab==="sform"?"suppliers":"chart";
+  else if(!tabs.some(function(t){return t[0]===state.tab;}))state.tab=cur=tabs[0][0];
+  $("tabs").innerHTML=tabs.map(function(t){return '<button type="button" role="tab" data-tab="'+t[0]+'" aria-selected="'+(cur===t[0])+'">'+t[1]+'</button>';}).join("");
+  $("view-chart").hidden=!dash||state.tab!=="chart";
+  $("view-projects").hidden=!dash||state.tab!=="projects";
+  $("view-suppliers").hidden=!dash||state.tab!=="suppliers";
+  $("view-positions").hidden=!dash||state.tab!=="positions";
+  $("view-profile").hidden=dash?state.tab!=="wform":state.tab!=="profile";
+  $("view-supjoin").hidden=dash?state.tab!=="sform":state.tab!=="supjoin";
+  $("brandSub").textContent=dash?"Construction workforce":"Join the crew";
+  $("role").textContent=dash?"Manager":"Join portal";
+  $("viewBtn").hidden=true;
+}
+
+function renderBanner(){
+  var b=$("banner");
+  if(state.mode==="preview"){
+    b.innerHTML="";
+  }else if(!state.uid&&(state.view==="portal")){
+    b.innerHTML="";
+  }else if(!state.canWrite){
+    b.innerHTML='<div class="banner"><strong>View-only access.</strong> Ask the owner to share this page with you as a Contributor so you can create your profile.</div>';
+  }else b.innerHTML="";
+}
+
+function renderStats(){
+  var all=Array.from(state.workers.values()),c=count(all);
+  $("stats").innerHTML=
+   '<div class="stat"><b>'+all.length+'</b><span>People registered</span></div>'+
+   '<div class="stat free"><b>'+c.free+'</b><span>Free now</span></div>'+
+   '<div class="stat busy"><b>'+c.busy+'</b><span>Occupied</span></div>'+
+   '<div class="stat"><b>'+activeProjects().length+'</b><span>Open projects</span></div>';
+}
+
+function renderFilters(){
+  var f=[["all","All"],["free","Free"],["busy","Occupied"],["off","Unavailable"]];
+  $("filters").innerHTML=f.map(function(x){return '<button type="button" class="chip" data-filter="'+x[0]+'" aria-pressed="'+(state.filter===x[0])+'">'+x[1]+'</button>';}).join("");
+}
+
+function renderChartNote(){
+  var n=$("chart-note");
+  if(state.mode==="live"&&state.workers.size===0){
+    n.innerHTML='<div class="banner"><strong>No workers yet.</strong> Tap Add worker to register your first person. Anyone who signs up on the registration page also appears here live.</div>';
+  }else n.innerHTML="";
+}
+
+function workerRow(w){
+  var s=statusOf(w);
+  var pill=s.key==="free"?'<span class="pill free">Free</span>':s.key==="busy"?'<span class="pill busy">Occupied</span>':'<span class="pill off">Unavailable</span>';
+  var meta=[w.title,w.years!==""&&w.years!=null?w.years+" yrs":"",w.area].filter(Boolean).join(" · ");
+  var act="";
+  if(state.isManager){
+    if(s.key==="busy")act='<button type="button" class="btn" data-act="release" data-a="'+esc(s.list[0].a.id)+'">Release</button>';
+    else if(s.key==="free")act='<button type="button" class="btn primary" data-act="assign-open" data-w="'+esc(w.id)+'">Assign'+(rateText(w)?' · '+esc(rateText(w)):'')+'</button>';
+  }
+  var h='<div class="w"><div class="av" aria-hidden="true">'+esc(initials(w.name))+'</div><div class="w-main"><div class="w-name">'+esc(w.name)+'</div>';
+  if(meta)h+='<div class="w-meta">'+esc(meta)+'</div>';
+  if(s.key==="busy")h+='<div class="w-proj">On '+esc(s.project.name)+'</div>';
+  else if(s.list&&s.list.length&&isMulti(w)){
+    h+='<div class="w-proj">On '+s.list.length+' project'+(s.list.length===1?'':'s')+'</div><div class="items" style="margin-top:4px">'+s.list.map(function(x){return '<button type="button" class="item-chip" data-act="release" data-a="'+esc(x.a.id)+'" aria-label="Remove from '+esc(x.p.name)+'">'+esc(x.p.name)+' ✕</button>';}).join("")+'</div>';
+  }
+  if(w.phone)h+='<div class="w-contact">'+esc(w.phone)+'</div>';
+  if(state.isManager)h+='<div style="margin-top:6px"><label class="sr" for="rl-'+esc(w.id)+'">Role</label><select class="in" id="rl-'+esc(w.id)+'" data-role-select data-w="'+esc(w.id)+'">'+Object.keys(DEPTS).map(function(k){return '<option value="'+esc(k)+'"'+(k===w.dept?' selected':'')+'>'+esc(DEPTS[k].name)+'</option>';}).join('')+'</select></div>';
+  h+='</div><div class="w-side">'+pill+act+(state.isManager?'<button type="button" class="btn" data-act="worker-edit" data-w="'+esc(w.id)+'">Edit</button>':'')+'</div>';
+  if(state.assigning===w.id){
+    var ps=activeProjects().filter(function(pr){return !s.list.some(function(x){return x.p.id===pr.id;});});
+    if(ps.length){
+      if(!ps.some(function(pr){return pr.id===state.assignPick;}))state.assignPick=ps[0].id;
+      h+='<div class="assign-row"><label class="sr" for="as-'+esc(w.id)+'">Project</label><select class="in" id="as-'+esc(w.id)+'" data-assign-select>'+
+        ps.map(function(p){return '<option value="'+esc(p.id)+'"'+(p.id===state.assignPick?" selected":"")+'>'+esc(p.name)+'</option>';}).join("")+
+        '</select><button type="button" class="btn primary" data-act="assign-confirm" data-w="'+esc(w.id)+'">Confirm</button><button type="button" class="btn" data-act="assign-cancel">Cancel</button></div>';
+    }else{
+      h+='<div class="assign-row"><span>'+(activeProjects().length?"Already on every open project.":"Create a project first.")+'</span><button type="button" class="btn primary" data-act="goto-projects">New project</button><button type="button" class="btn" data-act="assign-cancel">Cancel</button></div>';
+    }
+  }
+  return h+'</div>';
+}
+
+function renderTree(){
+  var by={};
+  state.workers.forEach(function(w){(by[w.dept]=by[w.dept]||[]).push(w);});
+  var h='<div class="owner"><span class="owner-mark"></span><div><div class="owner-role">Owner</div><div class="owner-name">You</div></div></div><div class="trunk"></div><div class="divs">';
+  DIVISIONS.forEach(function(dv){
+    var all=[];dv.depts.forEach(function(d){all=all.concat(by[d.id]||[]);});
+    var c=count(all);
+    h+='<div class="div"><div class="div-head"><h2>'+dv.name+'</h2><p>'+dv.sub+'</p><div class="div-count"><span class="f">'+c.free+' free</span> · <span class="b">'+c.busy+' occupied</span> · <span class="o">'+c.off+' unavailable</span></div></div><ul class="depts">';
+    dv.depts.forEach(function(d){
+      var ws=(by[d.id]||[]).slice().sort(sortWorkers),cc=count(ws),open=state.open.has(d.id);
+      var shown=ws.filter(function(w){return state.filter==="all"||statusOf(w).key===state.filter;});
+      h+='<li><button type="button" class="dept-btn" data-dept="'+d.id+'" aria-expanded="'+open+'" aria-controls="dp-'+d.id+'"><span class="chev" aria-hidden="true"></span><span class="dept-title"><span class="dept-name">'+d.name+'</span><span class="dept-hint">'+d.hint+'</span></span><span class="dept-sum">'+(ws.length?cc.free+" free of "+ws.length:"No one yet")+'</span><span class="bar-mini" aria-hidden="true"><i class="b-free" style="flex:'+cc.free+'"></i><i class="b-busy" style="flex:'+cc.busy+'"></i><i class="b-off" style="flex:'+cc.off+'"></i></span></button>';
+      if(open){
+        h+='<div class="dept-body" id="dp-'+d.id+'">';
+        if(!ws.length)h+='<div class="empty-note">No one has signed up for this department yet.</div>';
+        else if(!shown.length)h+='<div class="empty-note">No one here matches this filter.</div>';
+        else h+=shown.map(workerRow).join("");
+        h+='</div>';
+      }
+      h+='</li>';
+    });
+    h+='</ul></div>';
+  });
+  h+='</div>';
+  $("tree").innerHTML=h;
+}
+
+function fmtDate(s){if(!s)return "";var d=new Date(s+"T00:00:00");return isNaN(d)?s:d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});}
+var STATUS_LABEL={planning:"Planning",active:"Active",done:"Done"};
+
+function renderProjects(){
+  if(state.viewProject&&!state.projects.get(state.viewProject))state.viewProject=null;
+  $("projList").hidden=!!state.viewProject;
+  $("projDetail").hidden=!state.viewProject;
+  if(state.viewProject){renderProjDetail();return;}
+  var ps=Array.from(state.projects.values()).sort(function(a,b){
+    var o={active:0,planning:1,done:2};
+    return (o[a.status]-o[b.status])||String(b.createdAt||"").localeCompare(String(a.createdAt||""));
+  });
+  if(!ps.length){
+    $("projects").innerHTML='<div class="panel" style="grid-column:1/-1;margin:0"><strong>No projects yet.</strong><p class="sub">When the lead team wins a job, add it here, then assign free crew from the crew chart or from the project card.</p></div>';
+    return;
+  }
+  var free=Array.from(state.workers.values()).filter(function(w){return statusOf(w).key==="free";}).sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
+  $("projects").innerHTML=ps.map(function(p){
+    var team=Array.from(state.assignments.values()).filter(function(a){return a.projectId===p.id;}).map(function(a){return state.workers.get(a.workerId||a.id);}).filter(Boolean);
+    team.sort(function(a,b){return (DEPTS[a.dept]?DEPTS[a.dept].name:"").localeCompare(DEPTS[b.dept]?DEPTS[b.dept].name:"")||String(a.name).localeCompare(String(b.name));});
+    var dates=[fmtDate(p.start),fmtDate(p.end)].filter(Boolean).join(" to ");
+    var h='<article class="proj"><div class="proj-top"><div style="min-width:0"><h2><button type="button" class="link-h" data-act="proj-open" data-p="'+esc(p.id)+'">'+esc(p.name)+'</button></h2><div class="proj-meta">'+esc([p.client,p.site].filter(Boolean).join(" · "))+'</div>'+(dates?'<div class="proj-meta">'+esc(dates)+'</div>':'')+'</div>'+
+      '<label class="sr" for="st-'+esc(p.id)+'">Status</label><select class="in stat-select" id="st-'+esc(p.id)+'" data-status="'+esc(p.id)+'">'+["planning","active","done"].map(function(k){return '<option value="'+k+'"'+(p.status===k?" selected":"")+'>'+STATUS_LABEL[k]+'</option>';}).join("")+'</select></div>';
+    if(p.source)h+='<div><span class="tag">'+esc(p.source)+'</span></div>';
+    h+='<div class="team-h">Team ('+team.length+')</div>';
+    if(!team.length)h+='<div class="note">No one assigned yet.</div>';
+    team.forEach(function(w){
+      h+='<div class="team-row"><div><strong>'+esc(w.name)+'</strong><small>'+esc((DEPTS[w.dept]?DEPTS[w.dept].name:"")+(w.title?" · "+w.title:""))+'</small></div>'+(p.status==="done"?'':'<button type="button" class="btn" data-act="release" data-a="'+esc(assignId(w.id,p.id))+'">Release</button>')+'</div>';
+    });
+    var os=suppliesOf(p.id);
+    if(os.length)h+='<div class="note">Suppliers: '+os.length+' order'+(os.length===1?'':'s')+' · '+money(os.reduce(function(n,o){return n+(Number(o.amount)||0);},0))+'</div>';
+    if(p.status!=="done"){
+      var freeHere=free.filter(function(w){return !team.some(function(t2){return t2.id===w.id;});});
+      if(freeHere.length){
+        var groups={};freeHere.forEach(function(w){(groups[w.dept]=groups[w.dept]||[]).push(w);});
+        var opts=Object.keys(groups).map(function(k){return '<optgroup label="'+esc(DEPTS[k]?DEPTS[k].name:"Other")+'">'+groups[k].map(function(w){return '<option value="'+esc(w.id)+'">'+esc(w.name+(w.title?" ("+w.title+")":"")+(rateText(w)?" · "+rateText(w):""))+'</option>';}).join("")+'</optgroup>';}).join("");
+        h+='<div class="assign-row"><label class="sr" for="pa-'+esc(p.id)+'">Free worker</label><select class="in" id="pa-'+esc(p.id)+'" data-proj-pick="'+esc(p.id)+'">'+opts+'</select><button type="button" class="btn primary" data-act="proj-assign" data-p="'+esc(p.id)+'">Assign</button></div>';
+      }else h+='<div class="note">No free workers right now.</div>';
+    }
+    h+='<div class="proj-actions"><button type="button" class="btn primary" data-act="proj-open" data-p="'+esc(p.id)+'">View hierarchy</button>';
+    if(state.confirmDelete===p.id)h+='<button type="button" class="btn danger" data-act="proj-delete-yes" data-p="'+esc(p.id)+'">Confirm delete</button><button type="button" class="btn" data-act="proj-delete-no">Keep</button>';
+    else h+='<button type="button" class="btn" data-act="proj-delete" data-p="'+esc(p.id)+'">Delete project</button>';
+    return h+'</div></article>';
+  }).join("");
+  Object.keys(state.projPick).forEach(function(pid){var el=document.querySelector('[data-proj-pick="'+pid+'"]');if(el&&Array.prototype.some.call(el.options,function(o){return o.value===state.projPick[pid];}))el.value=state.projPick[pid];});
+}
+
+function renderMyStatus(){
+  var ed=!!state.edit&&state.edit.kind==="worker";
+  var d=ed?(state.edit.id?state.workers.get(state.edit.id):null):state.myDoc,el=$("myStatus");
+  $("backWorker").hidden=!ed;
+  if(ed){
+    $("sub-prof").textContent="Fill in the details for this worker. They show on the crew chart straight away.";
+    $("saveProf").disabled=false;
+    $("delProf").hidden=!d;
+    $("delProf").textContent=state.confirmDeleteProfile?"Confirm delete":"Delete worker";
+    $("saveProf").textContent=d?"Save changes":"Add worker";
+    $("h-prof").textContent=d?"Edit worker":"Add worker";
+    el.innerHTML="";
+    return;
+  }
+  $("sub-prof").textContent="Create your worker profile, choose your department and say when you are free. The company managers see your status on their crew chart.";
+  var canSave=!!state.uid&&state.canWrite||state.mode==="preview";
+  $("saveProf").disabled=!canSave;
+  $("delProf").hidden=!d;
+  $("delProf").textContent=state.confirmDeleteProfile?"Confirm delete":"Delete my profile";
+  $("saveProf").textContent=d?"Save changes":"Join the crew";
+  $("h-prof").textContent=d?"My worker profile":"Join the crew";
+  if(!d){
+    el.innerHTML='<div class="panel"><strong>You have not joined the crew yet.</strong><p class="note" style="margin-top:4px">Fill in the form below and you will appear on the company availability chart.</p></div>';
+    return;
+  }
+  var s=statusOf(d);
+  var pill=s.key==="free"?'<span class="pill free">Free</span>':s.key==="busy"?'<span class="pill busy">Occupied</span>':'<span class="pill off">Unavailable</span>';
+  var line=s.key==="busy"?"Assigned to "+esc(s.project.name)+".":(s.key==="off"?"You are marked unavailable. Managers will not assign you.":"You are marked available. Managers can assign you to a project.");
+  if(s.key!=="busy"&&s.list&&s.list.length)line="You are on "+s.list.length+" project"+(s.list.length===1?"":"s")+": "+s.list.map(function(x){return esc(x.p.name);}).join(", ")+". "+(s.key==="off"?"You are marked unavailable.":"Managers can assign you to more.");
+  var toggle=s.key==="busy"?"":'<button type="button" class="btn" data-act="toggle-avail">'+(d.available===false?"Mark me available":"Mark me unavailable")+'</button>';
+  el.innerHTML='<div class="panel status-card"><div><h2>'+esc(d.name)+'</h2><div class="note">'+esc((DEPTS[d.dept]?DEPTS[d.dept].name:"")+(d.title?" · "+d.title:""))+'</div><p style="margin-top:6px">'+line+'</p></div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+pill+toggle+'</div></div>';
+}
+
+function fillForm(doc){
+  var d=doc||state.myDoc;if(!d)return;
+  $("f-name").value=d.name||"";$("f-dept").value=d.dept||"";$("f-title").value=d.title||"";
+  $("f-years").value=d.years==null?"":d.years;$("f-phone").value=d.phone||"";$("f-area").value=d.area||"";
+  $("f-skills").value=d.skills||"";$("f-rate").value=d.rate==null?"":d.rate;$("f-rate-unit").value=d.rateUnit||"day";$("f-avail").checked=d.available!==false;
+  state.formFilled=true;
+}
+
+/* project detail: hierarchy diagram, most senior at the top */
+function nodeHtml(w,n){
+  var tone=n===1?'var(--accent)':'color-mix(in srgb,var(--primary) '+([0,85,68,52,40][n-1]||40)+'%,var(--surface))';
+  return '<div class="nd"><div class="nd-card" style="border-top-color:'+tone+'"><div class="av" aria-hidden="true">'+esc(initials(w.name))+'</div><div class="nd-name">'+esc(w.name)+'</div>'+(w.title?'<div class="nd-title">'+esc(w.title)+'</div>':'')+'<span class="nd-dept">'+esc(DEPTS[w.dept]?DEPTS[w.dept].name:"Other")+'</span></div></div>';
+}
+function supNodeHtml(o){
+  var x=state.suppliers.get(o.supplierId),del=o.status==="delivered";
+  return '<div class="nd"><div class="nd-card sup"><div class="nd-name">'+esc(supplierName(o.supplierId))+'</div>'+(x&&x.category?'<div class="nd-title">'+esc(x.category)+'</div>':'')+'<div class="sup-amt">'+money(o.amount)+'</div><div class="sup-do">'+esc(o.deliver)+'</div><div style="margin-top:6px"><span class="pill '+(del?'del':'ord')+'">'+(del?'Delivered':'Ordered')+'</span></div></div></div>';
+}
+function orgHtml(team,os,width){
+  var avail=Math.max(160,width-20);
+  var per=Math.max(1,Math.min(6,Math.floor(avail/160)));
+  var perSup=Math.max(1,Math.min(5,Math.floor(avail/208)));
+  var h='<div class="owner small"><span class="owner-mark"></span><div><div class="owner-role">Owner</div><div class="owner-name">You</div></div></div>';
+  var by=LEVELS.map(function(){return [];});
+  team.forEach(function(w){var i=RANK[w.dept];if(i==null)i=LEVELS.length-1;by[i].push(w);});
+  var n=0;
+  LEVELS.forEach(function(L,i){
+    var ws=by[i];if(!ws.length)return;
+    n++;
+    ws.sort(function(a,b){return (L.depts.indexOf(a.dept)-L.depts.indexOf(b.dept))||((Number(b.years)||0)-(Number(a.years)||0))||String(a.name).localeCompare(String(b.name));});
+    h+='<div class="vl"></div><div class="lv-tag">Level '+n+' · '+esc(L.name)+' ('+ws.length+')</div><div class="vl"></div>';
+    for(var k=0;k<ws.length;k+=per){
+      if(k>0)h+='<div class="vl"></div>';
+      h+='<div class="lv-row">'+ws.slice(k,k+per).map(function(w){return nodeHtml(w,n);}).join("")+'</div>';
+    }
+  });
+  if(!n)h+='<div class="vl"></div><div class="note" style="padding:4px 0 2px">No crew assigned yet. Assign people from the crew chart or the Projects list.</div>';
+  if(os.length){
+    h+='<div class="vl dash"></div><div class="lv-tag ext">Suppliers · external ('+os.length+')</div><div class="vl dash"></div>';
+    for(var j=0;j<os.length;j+=perSup){
+      if(j>0)h+='<div class="vl dash"></div>';
+      h+='<div class="lv-row ext">'+os.slice(j,j+perSup).map(supNodeHtml).join("")+'</div>';
+    }
+  }
+  return h;
+}
+
+function orderCtx(key){
+  var kind=key.charAt(0),id=key.slice(2),d=state.draft[key]||{};
+  var sups=Array.from(state.suppliers.values()).sort(byCompany);
+  var ps=activeProjects().sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
+  var sId=kind==="s"?id:d.s;
+  if(!state.suppliers.get(sId))sId=sups.length?sups[0].id:"";
+  var pId=kind==="p"?id:d.p,pp=state.projects.get(pId);
+  if(!pp||(kind!=="p"&&pp.status==="done"))pId=ps.length?ps[0].id:"";
+  return {d:d,sups:sups,ps:ps,s:sId,p:pId,kind:kind};
+}
+function orderForm(key){
+  var c=orderCtx(key),k=esc(key);
+  if(!c.sups.length)return '<div class="assign-row"><span>No supplier has joined yet.</span><button type="button" class="btn" data-act="order-cancel">Close</button></div>';
+  if(!c.ps.length)return '<div class="assign-row"><span>Create a project first.</span><button type="button" class="btn" data-act="order-cancel">Close</button></div>';
+  var sup=state.suppliers.get(c.s);
+  var h='<div class="assign-row" style="flex-direction:column;align-items:stretch;gap:12px;margin:10px 0"><div class="grid2">';
+  if(c.kind==="s")h+='<div class="field"><span class="lbl">Supplier</span><div>'+esc(sup.company)+'</div></div>';
+  else h+='<label class="field"><span class="lbl">Supplier</span><select class="in" data-draft="s" data-k="'+k+'">'+c.sups.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===c.s?' selected':'')+'>'+esc(x.company)+'</option>';}).join("")+'</select></label>';
+  if(c.kind==="p")h+='<div class="field"><span class="lbl">Project</span><div>'+esc(projectName(c.p))+'</div></div>';
+  else h+='<label class="field"><span class="lbl">Project</span><select class="in" data-draft="p" data-k="'+k+'">'+c.ps.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===c.p?' selected':'')+'>'+esc(x.name)+'</option>';}).join("")+'</select></label>';
+  h+='<label class="field"><span class="lbl">Amount ('+CUR+')</span><input class="in" type="number" min="0" step="any" inputmode="decimal" data-draft="amount" data-k="'+k+'" value="'+esc(c.d.amount||"")+'"></label>'+
+     '<label class="field"><span class="lbl">Deliver by (optional)</span><input class="in" type="date" data-draft="due" data-k="'+k+'" value="'+esc(c.d.due||"")+'"></label></div>';
+  var items=sup.items||[];
+  if(items.length)h+='<div><div class="lbl" style="margin-bottom:6px">Tap an item to add it</div><div class="items">'+items.map(function(it,i){return '<button type="button" class="item-chip" data-act="item-pick" data-k="'+k+'" data-s="'+esc(sup.id)+'" data-i="'+i+'">+ '+esc(it.name)+(it.unit?' ('+esc(it.unit)+')':'')+'</button>';}).join("")+'</div></div>';
+  h+='<label class="field"><span class="lbl">What to deliver</span><textarea class="in" maxlength="400" placeholder="Cement x 100 bags, River sand x 4 tonnes" data-draft="deliver" data-k="'+k+'">'+esc(c.d.deliver||"")+'</textarea></label>'+
+     '<div class="form-actions" style="margin-top:0"><button type="button" class="btn primary" data-act="order-save" data-k="'+k+'">Assign supplier</button><button type="button" class="btn" data-act="order-cancel">Cancel</button></div></div>';
+  return h;
+}
+function orderRow(o,mode){
+  var id=esc(o.id),del=o.status==="delivered";
+  var title=mode==="proj"?'<strong>'+esc(supplierName(o.supplierId))+'</strong>':'<button type="button" class="link-h" data-act="proj-open" data-p="'+esc(o.projectId)+'"><strong>'+esc(projectName(o.projectId))+'</strong></button>';
+  var rm=state.confirmOrder===o.id?'<button type="button" class="btn danger" data-act="order-del-yes" data-o="'+id+'">Confirm remove</button><button type="button" class="btn" data-act="order-del-no">Keep</button>':'<button type="button" class="btn" data-act="order-del" data-o="'+id+'">Remove</button>';
+  return '<div class="order-row"><div class="order-main">'+title+'<div class="note">'+esc(o.deliver)+'</div>'+(o.due?'<div class="note">Deliver by '+esc(fmtDate(o.due))+'</div>':'')+'</div><div class="order-amt">'+money(o.amount)+'</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="sr" for="os-'+id+'">Order status</label><select class="in stat-select" id="os-'+id+'" data-order-status="'+id+'"><option value="ordered"'+(del?'':' selected')+'>Ordered</option><option value="delivered"'+(del?' selected':'')+'>Delivered</option></select>'+rm+'</div></div>';
+}
+
+function renderProjDetail(){
+  var box=$("projDetail");
+  if(typing(box))return;
+  var p=state.projects.get(state.viewProject);if(!p)return;
+  var team=Array.from(state.assignments.values()).filter(function(a){return a.projectId===p.id;}).map(function(a){return state.workers.get(a.workerId||a.id);}).filter(Boolean);
+  var os=suppliesOf(p.id);
+  var total=os.reduce(function(n,o){return n+(Number(o.amount)||0);},0);
+  var delivered=os.filter(function(o){return o.status==="delivered";}).length;
+  var dates=[fmtDate(p.start),fmtDate(p.end)].filter(Boolean).join(" to ");
+  var key="p:"+p.id;
+  var h='<button type="button" class="btn back" data-act="proj-back">Back to projects</button>'+
+   '<div class="head-row"><div><h1>'+esc(p.name)+'</h1><p class="sub">'+esc([p.client,p.site].filter(Boolean).join(" · "))+(dates?(p.client||p.site?' · ':'')+esc(dates):'')+'</p></div><span class="tag">'+STATUS_LABEL[p.status]+'</span></div>'+
+   '<div class="stats"><div class="stat"><b>'+team.length+'</b><span>People on project</span></div><div class="stat"><b>'+os.length+'</b><span>Supplier orders</span></div><div class="stat"><b style="font-size:24px;padding-top:4px">'+money(total)+'</b><span>Supplier amount</span></div><div class="stat free"><b>'+delivered+' / '+os.length+'</b><span>Delivered</span></div></div>';
+  var width=box.clientWidth||Math.max(0,document.documentElement.clientWidth-32);
+  h+='<div class="org-wrap"><div class="org" aria-label="Project hierarchy, most senior at the top">'+orgHtml(team,os,width)+'</div></div>';
+  h+='<div class="panel"><div class="head-row" style="margin-bottom:8px"><h2>Supplier orders</h2>'+(p.status!=="done"&&state.orderOpen!==key?'<button type="button" class="btn primary" data-act="order-open" data-k="'+esc(key)+'">Assign a supplier</button>':'')+'</div>';
+  if(state.orderOpen===key&&p.status!=="done")h+=orderForm(key);
+  if(!os.length)h+='<div class="note">No supplier assigned to this project yet.</div>';
+  else h+=os.map(function(o){return orderRow(o,"proj");}).join("");
+  h+='</div>';
+  box.innerHTML=h;
+}
+
+/* positions tab (managers) */
+function renderPositions(){
+  var counts={};
+  state.workers.forEach(function(w){counts[w.dept]=(counts[w.dept]||0)+1;});
+  var opts=function(sel){return LEVELS.map(function(L,i){return '<option value="'+i+'"'+(i===sel?' selected':'')+'>Level '+(i+1)+' · '+esc(L.name)+'</option>';}).join("");};
+  var h="";
+  LEVELS.forEach(function(L,i){
+    var ds=[];
+    DIVISIONS.forEach(function(dv){dv.depts.forEach(function(d){if(d.level===i)ds.push(d);});});
+    h+='<div class="panel"><div class="team-h">Level '+(i+1)+' · '+esc(L.name)+(i===0?' · most senior':'')+'</div>';
+    if(!ds.length)h+='<div class="note" style="padding:8px 0">No positions at this level.</div>';
+    ds.forEach(function(d){
+      var n=counts[d.id]||0,id=esc(d.id);
+      var del=!d.custom?'':(state.confirmPos===d.id?'<button type="button" class="btn danger" data-act="pos-del-yes" data-d="'+id+'">Confirm delete</button><button type="button" class="btn" data-act="pos-del-no">Keep</button>':'<button type="button" class="btn" data-act="pos-del" data-d="'+id+'">Delete</button>');
+      h+='<div class="order-row"><div class="order-main"><strong>'+esc(d.name)+'</strong>'+(d.custom?' <span class="tag">Custom</span>':'')+(d.div==="support"?' <span class="tag">Many projects</span>':'')+'<div class="note">'+esc(d.divName)+(d.hint?' · '+esc(d.hint):'')+' · '+n+' '+(n===1?'person':'people')+'</div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="sr" for="pl-'+id+'">Level for '+esc(d.name)+'</label><select class="in stat-select" id="pl-'+id+'" data-pos-level="'+id+'">'+opts(i)+'</select>'+del+'</div></div>';
+    });
+    h+='</div>';
+  });
+  $("posList").innerHTML=h;
+}
+
+/* suppliers tab (managers) */
+function renderSuppliers(){
+  var box=$("suppliers");
+  if(typing(box))return;
+  var list=Array.from(state.suppliers.values()).sort(byCompany);
+  if(!list.length){
+    box.innerHTML='<div class="panel" style="grid-column:1/-1;margin:0"><strong>No suppliers yet.</strong><p class="sub">Tap Add supplier to register one with the items they supply. Suppliers who sign up on the registration page also appear here.</p></div>';
+    return;
+  }
+  box.innerHTML=list.map(function(x){
+    var os=Array.from(state.supplies.values()).filter(function(o){return o.supplierId===x.id;}).sort(function(a,b){return String(b.createdAt||"").localeCompare(String(a.createdAt||""));});
+    var total=os.reduce(function(n,o){return n+(Number(o.amount)||0);},0);
+    var items=x.items||[],key="s:"+x.id;
+    var h='<article class="sup-card"><div><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><h2>'+esc(x.company)+'</h2><button type="button" class="btn" data-act="sup-edit" data-s="'+esc(x.id)+'">Edit</button></div><div class="proj-meta">'+esc([x.category,x.area].filter(Boolean).join(" · "))+'</div><div class="proj-meta">'+esc([x.name,x.phone].filter(Boolean).join(" · "))+'</div></div>';
+    h+='<div class="team-h">Supplies ('+items.length+')</div><div class="items">'+items.map(function(it){return '<span class="item-chip">'+esc(it.name)+(it.unit?' · '+esc(it.unit):'')+(it.price!=null&&it.price!==""?' · '+money(it.price):'')+'</span>';}).join("")+'</div>';
+    h+='<div class="team-h">Assigned ('+os.length+')'+(os.length?' · '+money(total):'')+'</div>';
+    if(!os.length)h+='<div class="note">Not assigned to any project yet.</div>';
+    else h+=os.map(function(o){return orderRow(o,"sup");}).join("");
+    if(state.orderOpen===key)h+=orderForm(key);
+    else h+='<div class="proj-actions"><button type="button" class="btn primary" data-act="order-open" data-k="'+esc(key)+'">Assign to project</button></div>';
+    return h+'</article>';
+  }).join("");
+}
+
+function saveOrder(key){
+  var c=orderCtx(key),amt=Number(c.d.amount),deliver=String(c.d.deliver||"").trim();
+  if(!c.s||!c.p){toast("Choose a supplier and a project.");return;}
+  if(!(amt>0)){toast("Enter the amount for this order.");return;}
+  if(!deliver){toast("Describe what the supplier must deliver.");return;}
+  var o={supplierId:c.s,projectId:c.p,amount:amt,deliver:deliver,due:c.d.due||"",status:"ordered",createdAt:iso(),by:state.uid||""};
+  delete state.draft[key];state.orderOpen=null;
+  run(store.addSupply(o),"Supplier assigned.");
+}
+
+/* supplier join form */
+function renderSupItems(){
+  $("s-items").innerHTML=state.supItems.map(function(it,i){
+    return '<div class="item-row"><label class="field"><span class="lbl">Item</span><input class="in" maxlength="60" placeholder="Cement" data-item-f="name" data-i="'+i+'" value="'+esc(it.name)+'"></label>'+
+     '<label class="field"><span class="lbl">Unit</span><input class="in" maxlength="30" placeholder="50kg bag" data-item-f="unit" data-i="'+i+'" value="'+esc(it.unit)+'"></label>'+
+     '<label class="field"><span class="lbl">Price per unit ('+CUR+')</span><input class="in" type="number" min="0" step="any" inputmode="decimal" data-item-f="price" data-i="'+i+'" value="'+esc(it.price)+'"></label>'+
+     (state.supItems.length>1?'<button type="button" class="btn" data-act="item-del" data-i="'+i+'">Remove</button>':'<span></span>')+'</div>';
+  }).join("");
+}
+function fillSupForm(doc){
+  var d=doc||state.mySup;if(!d)return;
+  $("s-company").value=d.company||"";$("s-name").value=d.name||"";$("s-phone").value=d.phone||"";
+  $("s-cat").value=d.category||"Other";$("s-area").value=d.area||"";
+  state.supItems=(d.items&&d.items.length?d.items:[{name:"",unit:"",price:""}]).map(function(it){return {name:it.name||"",unit:it.unit||"",price:it.price==null?"":String(it.price)};});
+  renderSupItems();state.supFormFilled=true;
+}
+function renderMySup(){
+  var ed=!!state.edit&&state.edit.kind==="supplier";
+  var d=ed?(state.edit.id?state.suppliers.get(state.edit.id):null):state.mySup,el=$("mySupStatus");
+  $("backSup").hidden=!ed;
+  if(ed){
+    $("sub-sup").textContent="Fill in the supplier details and the items they supply. You can assign them to projects from the Suppliers tab.";
+    $("saveSup").disabled=false;
+    $("delSup").hidden=!d;
+    $("delSup").textContent=state.confirmDeleteSup?"Confirm delete":"Delete supplier";
+    $("saveSup").textContent=d?"Save changes":"Add supplier";
+    $("h-supjoin").textContent=d?"Edit supplier":"Add supplier";
+    el.innerHTML="";
+    return;
+  }
+  $("sub-sup").textContent="Register your company and list the things you supply. Managers can then assign you to a project with an amount and what to deliver.";
+  var canSave=!!state.uid&&state.canWrite||state.mode==="preview";
+  $("saveSup").disabled=!canSave;
+  $("delSup").hidden=!d;
+  $("delSup").textContent=state.confirmDeleteSup?"Confirm delete":"Delete my supplier profile";
+  $("saveSup").textContent=d?"Save changes":"Join as supplier";
+  $("h-supjoin").textContent=d?"My supplier profile":"Join as a supplier";
+  if(!state.supItemsRendered){state.supItemsRendered=true;renderSupItems();}
+  if(!d){
+    el.innerHTML='<div class="panel"><strong>You have not joined as a supplier yet.</strong><p class="note" style="margin-top:4px">Fill in the form below and list what you supply. Managers will see you on their supplier list.</p></div>';
+    return;
+  }
+  var items=d.items||[];
+  el.innerHTML='<div class="panel"><h2>'+esc(d.company)+'</h2><div class="note">'+esc([d.category,d.area].filter(Boolean).join(" · "))+'</div><p style="margin-top:6px">You are registered as a supplier. Managers can assign you to projects with an amount and what to deliver.</p><div class="items" style="margin-top:8px">'+items.map(function(it){return '<span class="item-chip">'+esc(it.name)+(it.unit?' · '+esc(it.unit):'')+'</span>';}).join("")+'</div></div>';
+}
+
+/* events */
+document.addEventListener("click",function(e){
+  var t=e.target.closest("[data-tab],[data-filter],[data-dept],[data-act]");
+  if(!t)return;
+  if(t.dataset.act&&document.activeElement&&document.activeElement!==document.body&&document.activeElement.blur)document.activeElement.blur();
+  if(t.dataset.tab){state.edit=null;state.tab=t.dataset.tab;renderAll();return;}
+  if(t.dataset.filter){state.filter=t.dataset.filter;renderAll();return;}
+  if(t.dataset.dept){var id=t.dataset.dept;if(state.open.has(id))state.open.delete(id);else state.open.add(id);renderTree();return;}
+  var a=t.dataset.act,w=t.dataset.w,p=t.dataset.p;
+  if(a==="goto-portal"){state.view="portal";state.tab="profile";state.assigning=null;renderAll();window.scrollTo(0,0);}
+  else if(a==="goto-dash"){state.view="dash";state.tab="chart";renderAll();window.scrollTo(0,0);}
+  else if(a==="assign-open"){state.assigning=w;var ps=activeProjects();state.assignPick=ps.length?ps[0].id:"";renderTree();}
+  else if(a==="assign-cancel"){state.assigning=null;renderTree();}
+  else if(a==="goto-projects"){state.assigning=null;state.tab="projects";$("projForm").hidden=false;renderAll();}
+  else if(a==="assign-confirm"){var pid=state.assignPick;state.assigning=null;if(pid)tryAssign(w,pid);else renderTree();}
+  else if(a==="release"){run(store.release(t.dataset.a),"Removed from the project.");}
+  else if(a==="proj-assign"){var sel=document.querySelector('[data-proj-pick="'+p+'"]');if(sel&&sel.value)tryAssign(sel.value,p);}
+  else if(a==="proj-delete"){state.confirmDelete=p;renderProjects();}
+  else if(a==="proj-delete-no"){state.confirmDelete=null;renderProjects();}
+  else if(a==="proj-delete-yes"){state.confirmDelete=null;run(releaseAllOn(p).then(function(){return removeSuppliesOn(p);}).then(function(){return store.deleteProject(p);}),"Project deleted.");}
+  else if(a==="proj-open"){state.viewProject=p;state.tab="projects";state.orderOpen=null;renderAll();window.scrollTo(0,0);}
+  else if(a==="proj-back"){state.viewProject=null;state.orderOpen=null;renderAll();}
+  else if(a==="order-open"){state.orderOpen=t.dataset.k;renderAll();}
+  else if(a==="order-cancel"){state.orderOpen=null;renderAll();}
+  else if(a==="item-pick"){
+    var sx=state.suppliers.get(t.dataset.s),it=sx&&sx.items&&sx.items[Number(t.dataset.i)];
+    if(it){var dr=state.draft[t.dataset.k]=state.draft[t.dataset.k]||{};dr.deliver=(dr.deliver?dr.deliver+", ":"")+it.name+" x 1";renderAll();}
+  }
+  else if(a==="order-save"){saveOrder(t.dataset.k);}
+  else if(a==="order-del"){state.confirmOrder=t.dataset.o;renderAll();}
+  else if(a==="order-del-no"){state.confirmOrder=null;renderAll();}
+  else if(a==="order-del-yes"){var oid=t.dataset.o;state.confirmOrder=null;run(store.deleteSupply(oid),"Order removed.");}
+  else if(a==="pos-del"){state.confirmPos=t.dataset.d;renderPositions();}
+  else if(a==="pos-del-no"){state.confirmPos=null;renderPositions();}
+  else if(a==="pos-del-yes"){
+    var did=t.dataset.d,held=Array.from(state.workers.values()).filter(function(x){return x.dept===did;}).length;
+    state.confirmPos=null;
+    if(held){toast("Move or remove the "+held+" "+(held===1?"person":"people")+" in this position first.");renderPositions();}
+    else run(store.deletePosition(did.slice(2)),"Position deleted.");
+  }
+  else if(a==="worker-add"){openWorkerForm();}
+  else if(a==="worker-edit"){openWorkerForm(t.dataset.w);}
+  else if(a==="sup-add"){openSupplierForm();}
+  else if(a==="sup-edit"){openSupplierForm(t.dataset.s);}
+  else if(a==="edit-back"){leaveEdit();}
+  else if(a==="item-add"){state.supItems.push({name:"",unit:"",price:""});renderSupItems();}
+  else if(a==="item-del"){state.supItems.splice(Number(t.dataset.i),1);if(!state.supItems.length)state.supItems.push({name:"",unit:"",price:""});renderSupItems();}
+  else if(a==="toggle-avail"&&state.myDoc){run(store.patchProfile({available:state.myDoc.available===false,updatedAt:iso()}));}
+});
+document.addEventListener("change",function(e){
+  var t=e.target;
+  if(t.matches("[data-assign-select]"))state.assignPick=t.value;
+  else if(t.matches("[data-proj-pick]"))state.projPick[t.dataset.projPick]=t.value;
+  else if(t.matches("[data-draft]")){draftSet(t);if(t.dataset.draft==="s"){t.blur();renderAll();}}
+  else if(t.matches("[data-pos-level]")){
+    var pid2=t.dataset.posLevel,lv=Number(t.value),dd=DEPTS[pid2];
+    if(dd&&dd.custom)run(store.patchPosition(pid2.slice(2),{level:lv}),"Position moved.");
+    else run(store.setLevel(pid2,lv),"Position moved.");
+  }
+  else if(t.matches("[data-order-status]"))run(store.patchSupply(t.dataset.orderStatus,{status:t.value}),"Order updated.");
+  else if(t.matches("[data-status]")){
+    var id=t.dataset.status,v=t.value;
+    run(store.patchProject(id,{status:v}).then(function(){return v==="done"?releaseAllOn(id):null;}),v==="done"?"Project marked done. Its crew is free again.":"Status updated.");
+  }
+});
+
+function draftSet(t){var k=t.dataset.k;state.draft[k]=state.draft[k]||{};state.draft[k][t.dataset.draft]=t.value;}
+document.addEventListener("input",function(e){
+  var t=e.target;if(!t.matches)return;
+  if(t.matches("[data-draft]"))draftSet(t);
+  else if(t.matches("[data-item-f]")){var r=state.supItems[Number(t.dataset.i)];if(r)r[t.dataset.itemF]=t.value;}
+});
+window.addEventListener("resize",function(){if(state.viewProject)schedule();});
+
+$("newProjBtn").addEventListener("click",function(){var f=$("projForm");f.hidden=!f.hidden;if(!f.hidden)$("p-name").focus();});
+$("cancelProj").addEventListener("click",function(){$("projForm").hidden=true;});
+$("projForm").addEventListener("submit",function(e){
+  e.preventDefault();
+  var name=$("p-name").value.trim();
+  $("p-name-err").textContent=name?"":"Enter a project name.";
+  if(!name)return;
+  var p={name:name,client:$("p-client").value.trim(),site:$("p-site").value.trim(),source:$("p-source").value,start:$("p-start").value,end:$("p-end").value,status:"planning",createdAt:iso()};
+  run(store.addProject(p),"Project created.");
+  this.reset();this.hidden=true;
+});
+
+/* department select and position form options */
+var deptSig="";
+function buildDeptSelect(){
+  var sig=DIVISIONS.map(function(dv){return dv.depts.map(function(d){return d.id+d.name;}).join("|");}).join("/");
+  if(sig===deptSig)return;
+  deptSig=sig;
+  var cur=$("f-dept").value;
+  var h='<option value="">Choose a department</option>';
+  DIVISIONS.forEach(function(dv){h+='<optgroup label="'+esc(dv.name)+'">'+dv.depts.map(function(d){return '<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>';}).join("")+'</optgroup>';});
+  $("f-dept").innerHTML=h;
+  if(cur&&DEPTS[cur])$("f-dept").value=cur;
+}
+(function(){
+  $("pos-div").innerHTML=BASE_DIVS.map(function(dv,i){return '<option value="'+dv.id+'"'+(i===1?' selected':'')+'>'+dv.name+'</option>';}).join("");
+  $("pos-level").innerHTML=BASE_LEVELS.map(function(l,i){return '<option value="'+i+'"'+(i===1?' selected':'')+'>Level '+(i+1)+' · '+l.name+(i===0?' (most senior)':'')+'</option>';}).join("");
+})();
+$("f-dept").addEventListener("change",function(){var d=DEPTS[this.value];if(d)$("f-title").placeholder=d.hint;});
+
+$("profForm").addEventListener("submit",function(e){
+  e.preventDefault();
+  var v={name:$("f-name").value.trim(),dept:$("f-dept").value,title:$("f-title").value.trim(),phone:$("f-phone").value.trim(),years:$("f-years").value.trim()};
+  var ok=true;
+  function chk(id,bad,msg){$(id+"-err").textContent=bad?msg:"";if(bad)ok=false;}
+  chk("f-name",!v.name,"Enter your full name.");
+  chk("f-dept",!v.dept,"Choose a department.");
+  chk("f-title",!v.title,"Enter your specialty.");
+  chk("f-phone",!v.phone,"Enter a phone number managers can call.");
+  var yrs=v.years===""?null:Number(v.years);
+  chk("f-years",yrs!==null&&(!(yrs>=0)||yrs>60),"Enter a number from 0 to 60.");
+  var rateRaw=$("f-rate").value.trim(),rate=Number(rateRaw);
+  chk("f-rate",rateRaw===""||!(rate>0),"Enter the amount you are willing to work for.");
+  $("f-form-err").textContent="";
+  if(!ok)return;
+  if(!state.uid&&state.mode!=="preview"){$("f-form-err").textContent="Unable to create your profile. Please try again.";return;}
+  var doc={name:v.name,dept:v.dept,title:v.title,phone:v.phone,years:yrs,rate:rate,rateUnit:$("f-rate-unit").value,area:$("f-area").value.trim(),skills:$("f-skills").value.trim(),available:$("f-avail").checked,updatedAt:iso()};
+  var ed=!!state.edit&&state.edit.kind==="worker",wasNew=ed?!state.edit.id:!state.myDoc,wid=ed?(state.edit.id||newId()):null;
+  store.saveProfile(doc,wid).then(function(){
+    if(ed){toast(wasNew?"Worker added.":"Worker saved.");leaveEdit();}
+    else{toast(state.myDoc?"Profile saved.":"You have joined the crew.");schedule();}
+  }).catch(function(err){$("f-form-err").textContent=dbError(err);});
+});
+$("delProf").addEventListener("click",function(){
+  if(!state.confirmDeleteProfile){state.confirmDeleteProfile=true;renderMyStatus();return;}
+  state.confirmDeleteProfile=false;
+  if(state.edit&&state.edit.kind==="worker"){
+    var wid=state.edit.id;
+    run(releaseWorker(wid).then(function(){return store.deleteProfile(wid);}).then(function(){leaveEdit();}),"Worker deleted.");
+    return;
+  }
+  run(store.deleteProfile().then(function(){state.formFilled=false;$("profForm").reset();$("f-avail").checked=true;}),"Profile deleted.");
+});
+
+$("posForm").addEventListener("submit",function(e){
+  e.preventDefault();
+  var name=$("pos-name").value.trim();
+  var dup=Object.keys(DEPTS).some(function(k){return DEPTS[k].name.toLowerCase()===name.toLowerCase();});
+  $("pos-name-err").textContent=!name?"Enter a position name.":(dup?"That position already exists.":"");
+  if(!name||dup)return;
+  run(store.addPosition({kind:"custom",name:name,hint:$("pos-hint").value.trim(),div:$("pos-div").value,level:Number($("pos-level").value),createdAt:iso()}),"Position added. It is now in the department list.");
+  this.reset();
+});
+$("supForm").addEventListener("submit",function(e){
+  e.preventDefault();
+  var company=$("s-company").value.trim(),phone=$("s-phone").value.trim(),ok=true,badPrice=false;
+  var items=state.supItems.map(function(it){
+    var pr=String(it.price==null?"":it.price).trim(),n=pr===""?null:Number(pr);
+    if(n!==null&&!(n>=0))badPrice=true;
+    return {name:String(it.name||"").trim(),unit:String(it.unit||"").trim(),price:n};
+  }).filter(function(it){return it.name;});
+  function chk(id,bad,msg){$(id+"-err").textContent=bad?msg:"";if(bad)ok=false;}
+  chk("s-company",!company,"Enter your company or business name.");
+  chk("s-phone",!phone,"Enter a phone number managers can call.");
+  chk("s-items",!items.length||badPrice,!items.length?"Add at least one item you supply.":"Prices must be numbers, or leave them empty.");
+  $("s-form-err").textContent="";
+  if(!ok)return;
+  if(!state.uid&&state.mode!=="preview"){$("s-form-err").textContent="Unable to create your supplier profile. Please try again.";return;}
+  var doc={company:company,name:$("s-name").value.trim(),phone:phone,category:$("s-cat").value,area:$("s-area").value.trim(),items:items,updatedAt:iso()};
+  var ed=!!state.edit&&state.edit.kind==="supplier",wasNew=ed?!state.edit.id:!state.mySup,sid=ed?(state.edit.id||newId()):null;
+  store.saveSupplier(doc,sid).then(function(){
+    if(ed){toast(wasNew?"Supplier added.":"Supplier saved.");leaveEdit();}
+    else{toast(state.mySup?"Supplier profile saved.":"You have joined as a supplier.");schedule();}
+  }).catch(function(err){$("s-form-err").textContent=dbError(err);});
+});
+$("delSup").addEventListener("click",function(){
+  if(!state.confirmDeleteSup){state.confirmDeleteSup=true;renderMySup();return;}
+  state.confirmDeleteSup=false;
+  if(state.edit&&state.edit.kind==="supplier"){
+    var sid=state.edit.id;
+    run(removeSuppliesFor(sid).then(function(){return store.deleteSupplier(sid);}).then(function(){leaveEdit();}),"Supplier deleted.");
+    return;
+  }
+  run(store.deleteSupplier().then(function(){state.supFormFilled=false;$("supForm").reset();state.supItems=[{name:"",unit:"",price:""}];renderSupItems();}),"Supplier profile deleted.");
+});
+
+/* Boot with sample data, then switch to live data when the store answers. */
+function snapMap(snap){var m=new Map();snap.docs.forEach(function(d){var x=d.data();if(x)m.set(d.id,Object.assign({id:d.id},x));});return m;}
+function goLive(db,user){
+  state.db=db;state.mode="live";
+  state.workers=new Map();state.projects=new Map();state.assignments=new Map();state.myDoc=null;
+  state.suppliers=new Map();state.supplies=new Map();state.mySup=null;state.viewProject=null;state.positions=new Map();
+  state.open=new Set(["engineers"]);
+  var uidP=user?user.id():Promise.resolve(null);
+  var mgrP=user?Promise.all([user.canEdit(),user.isOwner()]).then(function(r){return r[0]||r[1];}):Promise.resolve(false);
+  var wrP=user?user.can("data.write"):Promise.resolve(null);
+  return Promise.all([uidP,mgrP,wrP]).then(function(r){
+    state.uid=r[0];state.isManager=!!r[1];state.canWrite=true; /* write rules are per path: workers and suppliers write only their own profile, so the root-level answer does not apply to them */
+    var hash=String(location.hash||""),asPortal=!state.isManager||/^#(join|worker|supplier)/i.test(hash);
+    state.view=asPortal?"portal":"dash";state.tab=asPortal?(/supplier/i.test(hash)?"supjoin":"profile"):"chart";
+    var onErr=function(){schedule();};
+    db.collection("projects").onSnapshot(function(s){state.projects=snapMap(s);schedule();},onErr);
+    db.collection("positions").onSnapshot(function(s){state.positions=snapMap(s);schedule();},onErr);
+    db.collection("assignments").onSnapshot(function(s){state.assignments=snapMap(s);schedule();},onErr);
+    if(state.isManager){
+      db.collection("workers").onSnapshot(function(s){state.workers=snapMap(s);schedule();},onErr);
+      db.collection("suppliers").onSnapshot(function(s){state.suppliers=snapMap(s);schedule();},onErr);
+      db.collection("supplies").onSnapshot(function(s){state.supplies=snapMap(s);schedule();},onErr);
+    }
+    if(state.uid)db.doc("suppliers/"+state.uid).onSnapshot(function(s){
+      var d=s.exists?Object.assign({id:s.id},s.data()):null;
+      state.mySup=d;
+      if(d&&!state.supFormFilled&&!state.edit)fillSupForm();
+      schedule();
+    },onErr);
+    if(state.uid)db.doc("workers/"+state.uid).onSnapshot(function(s){
+      var d=s.exists?Object.assign({id:s.id},s.data()):null;
+      state.myDoc=d;
+      if(d&&!state.formFilled&&!state.edit)fillForm();
+      schedule();
+    },onErr);
+    schedule();
+  });
+}
+
+state.uid=null;
+document.addEventListener("change",function(e){
+  var t=e.target;if(!t||t.getAttribute("data-role-select")===null)return;
+  var id=t.getAttribute("data-w"),v=t.value;
+  var p=state.db?state.db.doc("workers/"+id).update({dept:v}):Promise.resolve().then(function(){var w=state.workers.get(id);if(w)w.dept=v;});
+  p.then(function(){toast("Role updated.");schedule();}).catch(function(err){toast(dbError(err));});
+});
+window.addEventListener("hashchange",function(){location.reload();});
+renderAll();
+(function boot(){
+  if(!window.claude||!window.claude.use)return;
+  Promise.all([window.claude.use("db"),window.claude.use("user")]).then(function(r){
+    if(r[0])return goLive(r[0],r[1]);
+  }).catch(function(){});
+})();
+})();
+</script>
+
+
+</body></html>
