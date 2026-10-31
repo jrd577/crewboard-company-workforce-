@@ -1,6 +1,8 @@
-/* Crewboard service worker. Keeps the app shell available and never caches live data.
+/* Crewboard manager app service worker.
+   It only touches manager.html, its icons and the manifest. Every other page on the site
+   (including the client and supplier sign-up page) is left completely alone.
    Bump VERSION when you change this file. */
-var VERSION = "crewboard-v1";
+var VERSION = "crewboard-v2";
 var SHELL = ["manager.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-180.png"];
 
 self.addEventListener("install", function (e) {
@@ -17,9 +19,9 @@ self.addEventListener("fetch", function (e) {
   var req = e.request;
   if (req.method !== "GET") return;
   var url = new URL(req.url);
-  if (url.origin !== location.origin) return;      /* Supabase, fonts and CDN scripts always go straight to the network */
+  if (url.origin !== location.origin) return;            /* Supabase, fonts and CDN scripts go straight to the network */
   if (req.mode === "navigate") {
-    /* the page itself: network first so updates show at once, cached copy only when offline */
+    if (!/\/manager\.html$/.test(url.pathname)) return;  /* index.html and any other page: not handled here */
     e.respondWith(
       fetch(req).then(function (res) {
         var copy = res.clone();
@@ -29,6 +31,7 @@ self.addEventListener("fetch", function (e) {
     );
     return;
   }
-  /* icons and manifest: cache first */
-  e.respondWith(caches.match(req).then(function (m) { return m || fetch(req); }));
+  if (/\/(manifest\.webmanifest|icon-[a-z0-9-]+\.png)$/.test(url.pathname)) {
+    e.respondWith(caches.match(req).then(function (m) { return m || fetch(req); }));
+  }
 });
