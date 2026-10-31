@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crewboard install check</title>
+<style>
+body{font:16px/1.45 system-ui,sans-serif;margin:0;padding:16px;background:#14293A;color:#fff}
+h1{font-size:22px;margin:0 0 4px}
+p{color:#b9c6cf;margin:0 0 14px}
+.row{background:#1d3a50;border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.ok{border-left:6px solid #3ecf8e}.bad{border-left:6px solid #ff6b6b}.wait{border-left:6px solid #f2b01e}
+b{display:block}small{color:#b9c6cf;word-break:break-word}
+button{font:inherit;padding:10px 16px;border-radius:8px;border:0;background:#f2b01e;color:#14293A;font-weight:700;margin:6px 0 14px}
+pre{white-space:pre-wrap;background:#0d1b27;padding:10px;border-radius:8px;font-size:13px}
+</style></head><body>
+<h1>Crewboard install check</h1>
+<p>Put this file next to manager.html, open it in Chrome, then screenshot the results.</p>
+<button id="go">Run the check again</button>
+<div id="out"></div>
+<pre id="sum"></pre>
+<script>
+var PAGE="manager.html", out=document.getElementById("out"), sum=document.getElementById("sum");
+function row(state,title,detail){
+  var d=document.createElement("div");d.className="row "+state;
+  d.innerHTML="<b>"+(state==="ok"?"PASS  ":state==="bad"?"FAIL  ":"INFO  ")+title+"</b><small>"+(detail||"")+"</small>";
+  out.appendChild(d);
+  return state;
+}
+function get(url){
+  return fetch(url+(url.indexOf("?")<0?"?":"&")+"t="+Date.now(),{cache:"no-store"}).then(function(r){
+    return r.text().then(function(t){return {status:r.status,type:r.headers.get("content-type")||"",text:t,url:r.url};});
+  });
+}
+function img(url){
+  return new Promise(function(res){
+    var i=new Image();i.onload=function(){res({ok:true,w:i.naturalWidth,h:i.naturalHeight});};
+    i.onerror=function(){res({ok:false});};i.src=url+"?t="+Date.now();
+  });
+}
+function run(){
+  out.innerHTML="";sum.textContent="";
+  var bad=[];
+  function add(s,t,d){if(row(s,t,d)==="bad")bad.push(t);}
+  add(window.isSecureContext?"ok":"bad","Secure connection (https)",location.href);
+  var manifestUrl=null,iconList=[];
+  get(PAGE).then(function(p){
+    if(p.status!==200){add("bad","Page "+PAGE+" loads","HTTP "+p.status+". Is the file named "+PAGE+"?");return;}
+    add("ok","Page "+PAGE+" loads","HTTP 200, "+p.type);
+    var m=/<link[^>]+rel=["']manifest["'][^>]*>/i.exec(p.text);
+    if(!m){add("bad","Page links a manifest","No manifest link found in "+PAGE+". This copy of the page is the OLD one. Upload the new manager.html.");return;}
+    var h=/href=["']([^"']+)["']/i.exec(m[0]);
+    manifestUrl=h?h[1]:null;
+    add("ok","Page links a manifest","href = "+manifestUrl);
+    add(/theme-color/i.test(p.text)?"ok":"bad","Page has theme-color","");
+    add(/serviceWorker/.test(p.text)&&/register\(/.test(p.text)?"ok":"bad","Page registers a service worker","Looks for navigator.serviceWorker.register in the page");
+  }).catch(function(e){add("bad","Fetch "+PAGE,String(e));})
+  .then(function(){
+    if(!manifestUrl)return;
+    return get(manifestUrl).then(function(r){
+      if(r.status!==200){add("bad","Manifest loads","HTTP "+r.status+" at "+r.url);return;}
+      var j;
+      try{j=JSON.parse(r.text);}catch(e){add("bad","Manifest is valid JSON","It is not JSON. Content-Type "+r.type+". First characters: "+r.text.slice(0,60).replace(/</g,"&lt;"));return;}
+      add("ok","Manifest loads and is valid JSON","Content-Type "+r.type);
+      add(j.name||j.short_name?"ok":"bad","Manifest has a name",j.name);
+      add(j.start_url?"ok":"bad","Manifest has start_url",j.start_url);
+      add(j.display==="standalone"||j.display==="fullscreen"||j.display==="minimal-ui"?"ok":"bad","Manifest display mode",j.display);
+      iconList=(j.icons||[]);
+      var base=new URL(manifestUrl,location.href).href;
+      var sizes=iconList.map(function(ic){return ic.sizes;}).join(", ");
+      add(iconList.some(function(i){return /192/.test(i.sizes);})&&iconList.some(function(i){return /512/.test(i.sizes);})?"ok":"bad","Manifest lists 192 and 512 icons",sizes);
+      return Promise.all(iconList.map(function(ic){
+        var u=new URL(ic.src,base).href;
+        return img(u).then(function(x){
+          add(x.ok?"ok":"bad","Icon loads: "+ic.src,x.ok?x.w+"x"+x.h+" (declared "+ic.sizes+")":"Could not load "+u);
+        });
+      }));
+    }).catch(function(e){add("bad","Fetch manifest",String(e));});
+  }).then(function(){
+    return get("sw.js").then(function(r){
+      if(r.status!==200){add("bad","sw.js loads","HTTP "+r.status);return;}
+      var js=/javascript|ecmascript/i.test(r.type)&&!/^\s*</.test(r.text);
+      add(js?"ok":"bad","sw.js is JavaScript","Content-Type "+r.type+(js?"":". It returned a web page instead of code, so the file is missing or redirected."));
+    }).catch(function(e){add("bad","Fetch sw.js",String(e));});
+  }).then(function(){
+    add("info","Browser","display-mode standalone: "+matchMedia("(display-mode: standalone)").matches+" | "+navigator.userAgent);
+    sum.textContent=bad.length?("Problems found ("+bad.length+"):\n- "+bad.join("\n- ")):"Everything checks out. If Chrome still says it cannot install, clear this site's data and reopen "+PAGE+" directly.";
+  });
+}
+document.getElementById("go").onclick=run;run();
+</script></body></html>
