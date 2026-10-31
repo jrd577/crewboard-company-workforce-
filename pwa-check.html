@@ -43,16 +43,16 @@ function run(){
   add(window.isSecureContext?"ok":"bad","Secure connection (https)",location.href);
   var manifestUrl=null,iconList=[];
   get(PAGE).then(function(p){
-    if(p.status!==200){add("bad","Page "+PAGE+" loads","HTTP "+p.status+". Is the file named "+PAGE+"?");return;}
-    add("ok","Page "+PAGE+" loads","HTTP 200, "+p.type);
+    if(p.status!==200){add("bad","Manager page (manager.html) loads","HTTP "+p.status+". Is manager.html uploaded?");return;}
+    add("ok","Manager page (manager.html) loads","HTTP 200, "+p.type);
     var m=/<link[^>]+rel=["']manifest["'][^>]*>/i.exec(p.text);
-    if(!m){add("bad","Page links a manifest","No manifest link found in "+PAGE+". This copy of the page is the OLD one. Upload the new manager.html.");return;}
+    if(!m){add("bad","Page links a manifest","No manifest link found in manager.html. It is the OLD copy. Upload the new manager.html.");return;}
     var h=/href=["']([^"']+)["']/i.exec(m[0]);
     manifestUrl=h?h[1]:null;
     add("ok","Page links a manifest","href = "+manifestUrl);
     add(/theme-color/i.test(p.text)?"ok":"bad","Page has theme-color","");
     add(/serviceWorker/.test(p.text)&&/register\(/.test(p.text)?"ok":"bad","Page registers a service worker","Looks for navigator.serviceWorker.register in the page");
-  }).catch(function(e){add("bad","Fetch "+PAGE,String(e));})
+  }).catch(function(e){add("bad","Fetch manager.html",String(e));})
   .then(function(){
     if(!manifestUrl)return;
     return get(manifestUrl).then(function(r){
@@ -81,8 +81,17 @@ function run(){
       add(js?"ok":"bad","sw.js is JavaScript","Content-Type "+r.type+(js?"":". It returned a web page instead of code, so the file is missing or redirected."));
     }).catch(function(e){add("bad","Fetch sw.js",String(e));});
   }).then(function(){
+    if(!("serviceWorker" in navigator)){add("bad","Service worker supported","Not supported in this browser");return;}
+    return navigator.serviceWorker.register("sw.js").then(function(reg){
+      return Promise.race([navigator.serviceWorker.ready,new Promise(function(_,rej){setTimeout(function(){rej(new Error("timed out after 8 seconds"));},8000);})]);
+    }).then(function(reg){
+      add("ok","Service worker installs and activates","scope: "+reg.scope);
+    }).catch(function(e){
+      add("bad","Service worker installs and activates",String(e&&e.message||e)+". The worker could not cache its files, so a file it lists is missing from the site.");
+    });
+  }).then(function(){
     add("info","Browser","display-mode standalone: "+matchMedia("(display-mode: standalone)").matches+" | "+navigator.userAgent);
-    sum.textContent=bad.length?("Problems found ("+bad.length+"):\n- "+bad.join("\n- ")):"Everything checks out. If Chrome still says it cannot install, clear this site's data and reopen "+PAGE+" directly.";
+    sum.textContent=bad.length?("Problems found ("+bad.length+"):\n- "+bad.join("\n- ")):"Everything checks out. If Chrome still says it cannot install, clear this site's data and reopen manager.html directly.";
   });
 }
 document.getElementById("go").onclick=run;run();
