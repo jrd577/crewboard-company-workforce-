@@ -1,7 +1,7 @@
 /* Crewboard service worker. Keeps the app shell available and never caches live data.
    Bump VERSION when you change this file. */
 var VERSION = "crewboard-v1";
-var SHELL = ["./", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-180.png"];
+var SHELL = ["manager.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-180.png"];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
@@ -25,7 +25,7 @@ self.addEventListener("fetch", function (e) {
         var copy = res.clone();
         caches.open(VERSION).then(function (c) { c.put(req, copy); });
         return res;
-      }).catch(function () { return caches.match(req).then(function (m) { return m || caches.match("./"); }); })
+      }).catch(function () { return caches.match(req).then(function (m) { return m || caches.match("manager.html"); }); })
     );
     return;
   }
